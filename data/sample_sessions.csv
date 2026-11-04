@@ -1,0 +1,47 @@
+date,sport_type,duration_min,rpe,notes
+2026-01-05,running,49,5,easy-moderate run
+2026-01-06,strength,59,6,full body
+2026-01-08,running,41,7,intervals
+2026-01-10,cycling,88,6,endurance ride
+2026-01-11,running,62,6,long run
+2026-01-12,running,45,5,easy-moderate run
+2026-01-13,strength,56,7,full body
+2026-01-15,running,45,9,intervals
+2026-01-17,cycling,84,6,endurance ride
+2026-01-18,running,68,6,long run
+2026-01-19,running,51,5,easy-moderate run
+2026-01-20,strength,62,6,full body
+2026-01-22,running,46,8,intervals
+2026-01-24,cycling,87,5,endurance ride
+2026-01-25,running,75,6,long run
+2026-01-26,running,48,6,easy-moderate run
+2026-01-27,strength,58,6,full body
+2026-01-29,running,47,7,intervals
+2026-01-31,cycling,96,6,endurance ride
+2026-02-01,running,68,6,long run
+2026-02-02,running,49,6,easy-moderate run
+2026-02-03,strength,67,7,full body
+2026-02-05,running,51,8,intervals
+2026-02-07,cycling,97,4,endurance ride
+2026-02-08,running,69,6,long run
+2026-02-09,running,69,7,tempo run
+2026-02-10,strength,71,8,heavy lower body
+2026-02-10,cycling,43,5,spin
+2026-02-12,running,56,9,hard intervals
+2026-02-13,cycling,121,6,long ride
+2026-02-14,running,89,7,long tempo
+2026-02-14,strength,47,7,upper body
+2026-02-15,running,115,7,"very long run, heavy legs"
+2026-02-16,running,37,6,easy-moderate run
+2026-02-17,strength,41,6,full body
+2026-02-19,running,32,7,intervals
+2026-02-21,cycling,64,5,endurance ride
+2026-02-22,running,49,6,long run
+2026-02-23,running,45,6,easy-moderate run
+2026-02-24,strength,55,7,full body
+2026-02-26,running,41,8,intervals
+2026-02-28,cycling,90,4,endurance ride
+2026-03-01,running,64,5,long run
+2026-03-02,running,52,6,easy-moderate run
+2026-03-03,strength,58,6,full body
+2026-03-05,running,48,9,intervals

@@ -1,0 +1,2 @@
+# Store and check out text files with LF endings, so files behave the same in Linux Docker images.
+* text=auto eol=lf

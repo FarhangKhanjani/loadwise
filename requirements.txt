@@ -1,0 +1,8 @@
+# Direct dependencies only, pinned. Added phase by phase.
+
+# Phase 1: storage and config
+SQLAlchemy==2.1.8
+python-dotenv==1.2.4
+
+# Tests
+pytest==9.2.0

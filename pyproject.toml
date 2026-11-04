@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+# Lets both `pytest` and `python -m pytest` import the `src` package from the project root.
+pythonpath = ["."]
+testpaths = ["tests"]

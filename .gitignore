@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Local databases (your real training data lives here)
+*.db
+*.db-journal
+
+# Agent logs (contain training and wellness data)
+logs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
