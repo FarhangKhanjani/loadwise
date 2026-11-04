@@ -2,3 +2,7 @@
 # Lets both `pytest` and `python -m pytest` import the `src` package from the project root.
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.coverage.report]
+# The script entry-point guard is not logic worth measuring.
+exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:"]

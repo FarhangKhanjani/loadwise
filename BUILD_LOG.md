@@ -46,3 +46,45 @@ All code, tests, sample data generator and this log entry.
 - Chose two CSV files, safe (idempotent) import, fixed dates for sample data, separate real/demo databases
 - Accepted the proposed defaults for metric details (ACWR history start, coupled ACWR, monotony SD, threshold edges, missing wellness days, `as_of` date for rules) and for the risks (bot restricted to my chat ID, plan-change confirmation only records the decision, CLI y/n confirmation in Phase 3)
 - _(add anything else here)_
+
+---
+
+## Phase 2: Metrics and rules (2026-11-04)
+
+### What was built
+- `src/metrics.py`: session load, daily loads, acute, chronic, ACWR, monotony, strain, and a `LoadMetrics` bundle. Pure functions, no database
+- `src/rules.py`: six flag rules, `evaluate_flags()`, and a CLI (`python -m src.rules --db data/demo.db --as-of 2026-02-15`)
+- `tests/test_metrics.py` (19 tests) and `tests/test_rules.py` (33 tests, many parametrized); 65 tests in total
+- `pytest-cov`: **100% line coverage** on `metrics.py` and `rules.py`
+
+### Key decisions
+- **Pure functions, database at the edges.** Metrics and rules take plain data (`dict[date, int]`, wellness by date) and never query the database. Easy to test, and reused unchanged by the agent tools, daily check and evals.
+- **Missing date = rest day.** Daily loads are a dict; `daily.get(day, 0)` makes rest days free.
+- **Duck typing via `Protocol`.** Metrics accept anything with `.date`, `.duration_min`, `.rpe`, so ORM rows and tiny test dataclasses both work.
+- **ACWR history** counts from the first day with any logged data (session or wellness). Fewer than 28 days → `None`, because days before logging started would look like rest and inflate the ratio. Chronic load 0 → `None` (undefined).
+- **Population SD (ddof=0) for monotony.** The 7 days are the whole week being described, not a sample. Sample SD would give ~7% lower monotony. SD 0 → `None`.
+- **Round to 2 decimals before comparing to thresholds**, so the number in a message always agrees with the flag (a raw 1.5004 would otherwise display as "1.50" yet be flagged "above 1.5").
+- **Threshold edges:** ACWR > 1.5 high, 1.3 ≤ x ≤ 1.5 medium, < 0.8 low; monotony > 2.0; sleep < 6.0 h (exactly 6.0 is fine); soreness ≥ 7 on `as_of` and the day before. Missing wellness days never count as bad and break the soreness streak.
+- **No flag without data.** If ACWR is `None`, no ACWR flag is raised: say nothing rather than guess.
+- **No numpy.** `statistics` from the standard library is enough for 7-28 numbers.
+
+### Results on the sample data
+| As of | ACWR | Monotony | Flags |
+| --- | --- | --- | --- |
+| 2026-02-01 | 1.03 | 1.42 | none |
+| 2026-02-12 | 1.21 | 1.41 | high soreness |
+| 2026-02-15 | **1.69** | 2.08 | high load spike, high monotony, poor sleep, high soreness |
+| 2026-02-22 | 0.55 | 1.52 | undertraining |
+| 2026-03-05 | 0.78 | 1.54 | undertraining |
+
+### Observations worth discussing
+- **Wellness reacted before ACWR.** On Feb 12 soreness was already flagged while ACWR (1.21) looked fine: the 7-day window only catches a spike once most of the week is in it. Subjective wellness can be the earlier signal.
+- **The deload is flagged as undertraining**, and still is on the last day of data (Mar 5, ACWR 0.78), because the spike week inflates the chronic load for 4 weeks. Known limitation of ratio-based monitoring; goes in the README.
+- **High monotony fired in the spike week** (2.08) without being designed for it: training 6 of 7 days with similar loads.
+
+### What the AI generated
+All code and tests in this phase, and this log entry.
+
+### What I decided or changed myself
+- Approved the plan, including population SD, rounding before comparing, and the threshold edges
+- _(add anything else here)_
