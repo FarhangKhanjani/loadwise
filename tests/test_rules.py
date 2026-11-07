@@ -140,12 +140,10 @@ def test_evaluate_flags_without_enough_history_skips_acwr_but_checks_wellness():
 # ---------- the real sample data ----------
 
 @pytest.fixture
-def sample(db):
-    """The committed sample CSVs imported into an in-memory database."""
-    import_sessions(db, DATA / "sample_sessions.csv")
-    import_wellness(db, DATA / "sample_wellness.csv")
-    daily = daily_loads(db.scalars(select(TrainingSession)))
-    wellness = {w.date: w for w in db.scalars(select(Wellness))}
+def sample(sample_db):
+    """Inputs for evaluate_flags built from the committed sample data."""
+    daily = daily_loads(sample_db.scalars(select(TrainingSession)))
+    wellness = {w.date: w for w in sample_db.scalars(select(Wellness))}
     history_start = min(min(daily), min(wellness))
     return daily, wellness, history_start
 

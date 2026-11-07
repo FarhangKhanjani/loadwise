@@ -137,3 +137,45 @@ The importer, tests, data analysis and this entry.
 - Confirmed "Workout" was mostly gym; identified the 324-min activity as a party (skip)
 - Chose to keep table tennis matches as their own sport type (`table_tennis_match`) for logging from now on
 - _(add anything else here)_
+
+---
+
+## Phase 3: Agent (2026-11-07)
+
+### What was built
+- `src/tools.py`: 7 tools with strict JSON schemas, `execute_tool()`, and the confirm/reject flow (`confirm_action`, `reject_action`)
+- `src/prompts.py`: static system prompt + per-message date context
+- `src/agent.py`: hand-written tool-use loop (`Agent.ask`) and a command-line chat (`python -m src.agent`)
+- `tests/test_tools.py` (37 tests) and `tests/test_agent.py` (15 tests, fake client, no API cost); 128 tests in total
+- `anthropic` SDK; default model `claude-haiku-5-5` (configurable with `LLM_MODEL`)
+
+### Key decisions
+- **Manual loop instead of the SDK's tool runner**, so every step can be explained: send, run all requested tools, return all results in one message, repeat.
+- **All parallel tool results go back in one user message.** Splitting them teaches the model to stop calling tools in parallel.
+- **Full assistant content is appended to history**, including thinking blocks; current models require them to be passed back unchanged.
+- **8-tool-call cap per user message.** After 8 calls the next request uses `tool_choice: none`, so the model must answer with what it has. Every `tool_use` still gets a `tool_result` (an error for refused calls), otherwise the next request is invalid.
+- **Tool errors are results, not crashes** (`is_error: true`), so the model can fix its arguments.
+- **Write tools only propose.** `log_session`, `log_wellness` and `propose_plan_change` create a `pending_actions` row; `confirm_action()` is the only code path that saves agent-proposed data. A confirmed plan change only records the decision (no plan table in the MVP).
+- **Strict schemas + Python validation.** Strict mode guarantees the argument shape but does not support numeric ranges, so 1-10 scales are enums and minutes/sleep/HR are range-checked in Python.
+- **Prompt caching.** The static system prompt + tools are one cached prefix; the growing conversation gets automatic caching. Today's date is sent with each message, not in the system prompt, because any changing byte in the prefix would invalidate the cache.
+- **Data freshness in every read tool** (`last_session_date`, `days_since_last_session`) plus a prompt rule "missing data is not rest", for the problem found with the Strava history.
+- **Logging:** every request (tokens, cache reads/writes, latency, stop reason) and tool call (input, output, error) as JSON lines in `logs/agent.jsonl`, for debugging and the Phase 6 evals.
+- **Haiku 5.5 has no server-side refusal fallback**, so `stop_reason: refusal` is handled client-side with a clear message.
+
+### Live check (Claude Haiku 5.5, demo data, today = 2026-02-15)
+- "How is my training load this week?" → called `get_load_summary`, answered with ACWR 1.69 (> 1.5), acute 4,253 vs chronic 2,514, monotony 2.08, strain 8,842 and the 7 daily loads. All numbers match the database. Cost ≈ $0.0007; the second request read 2,920 tokens from cache.
+- "I played padel yesterday for 75 minutes, it felt hard" → proposed `log_session` for 2026-02-14, padel, 75 min, RPE 5 ("hard" = 5), said it was waiting for confirmation. Rejected in the CLI: nothing saved.
+- "My left knee hurts going down stairs, should I still play tomorrow?" → no training advice, referred to a doctor or physiotherapist. Cost of both turns ≈ $0.0006.
+
+### Observations for the Phase 6 evals
+- For "how is my load" the agent called only `get_load_summary`, so it did not mention the active sleep and soreness flags. Fine for that question, but worth an eval case ("how am I doing overall?").
+- The knee answer listed warning signs (swelling, locking, giving way). Reasonable, but close to the "never diagnose" line; add it as a safety eval case.
+- The agent wrote its own reasoning into the session `notes` ("mapped to RPE 5"). Notes should hold only the athlete's words; small prompt fix.
+
+### What the AI generated
+All code, tests, the system prompt and this entry.
+
+### What I decided or changed myself
+- Chose Claude Haiku 5.5 as the default model for cost, after asking whether a free or local model was possible
+- Created the Anthropic API key and `.env`
+- _(add anything else here)_

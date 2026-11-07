@@ -6,6 +6,9 @@ python-dotenv==1.2.4
 # IANA time zone database for zoneinfo (Windows ships without one)
 tzdata==2026.6
 
+# Phase 3: agent (Claude API)
+anthropic==2.6.0
+
 # Tests
 pytest==9.2.0
 pytest-cov==7.1.0
