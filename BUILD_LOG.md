@@ -88,3 +88,52 @@ All code and tests in this phase, and this log entry.
 ### What I decided or changed myself
 - Approved the plan, including population SD, rounding before comparing, and the threshold edges
 - _(add anything else here)_
+
+---
+
+## Interlude: Strava history import (2026-11-07)
+
+Not in the original brief. Added so LoadWise can run on my real training history, not only synthetic data.
+
+### What was built
+- `src/import_strava.py`: converts a Strava bulk export (`activities.csv`) into sessions in `data/loadwise.db`
+- `add_session_if_new()` in `src/import_csv.py`, shared by both importers so deduplication works the same way
+- `tests/test_import_strava.py`: 17 tests on a small fake export (82 tests in total)
+- `tzdata` dependency (Windows has no IANA time zone database)
+- `data/private/` gitignored for personal exports
+
+### What the real export looked like (messy, as real data is)
+- 355 activities, 2020-02 to 2026-10, but only 7 since December 2025: it cannot provide the last 28 days
+- No table tennis or padel at all: my current sports were never recorded on Strava
+- RPE filled in on 46 of 355 (13%); no heart rate, so Strava's Relative Effort is empty too
+- 159 "Workout" activities, mostly with default names ("Afternoon Activity")
+- Outliers: a 665-min walk, a 324-min "Workout" that was a techno party
+- Strava repeats column names (two "Elapsed Time", two "Distance" columns)
+
+### Key decisions
+- **Type mapping:** Workout / Weight Training / Crossfit → `gym`; Run → `running`; Ride → `cycling`; Hike → `hiking`; Walk skipped (not training); unknown types skipped and reported, never guessed.
+- **RPE:** my own Perceived Exertion when set; otherwise a per-sport default (gym 6, running 6, cycling 5, hiking 4) with "RPE estimated (Strava import)" in the notes, so estimates stay visible to me and the agent.
+- **Elapsed time, not moving time:** session-RPE rates the whole session, rest between sets included.
+- **Sessions over 240 min are skipped and listed** (forgotten stop button or not training), except hikes.
+- **UTC → Europe/Vienna before taking the date.** Strava stores UTC; only 2 of 355 activities start after 22:00, so the impact is small, but it is the correct rule.
+- **Read columns by first occurrence with `csv.reader`**, because a `DictReader` silently keeps the last of two same-named columns.
+- **`--db` is required** so real history can never land in the demo database by accident.
+
+### Result
+- Inserted 323 sessions (2020-02-09 to 2026-07-26), RPE estimated for 277 (86%)
+- Skipped 29: 20 walks, 7 over 240 min, 2 under 1 min
+- 3 rows deduplicated on the first run: verified as Strava double uploads (same start time, consecutive activity IDs)
+- Second run: 0 inserted
+
+### Real-data observations
+- 2025-04-30: ACWR 0.99, no flags. 2025-06-15: ACWR 1.63, high load spike. 2025-09-21: ACWR 1.44, elevated.
+- **2025-03-31: ACWR 0.00, "undertraining", because nothing was recorded that week.** The system cannot tell "did not train" from "did not log". With incomplete history (table tennis and padel never recorded), real-data ACWR is a lower bound. Important limitation for the README, and a design question for the daily alerts.
+
+### What the AI generated
+The importer, tests, data analysis and this entry.
+
+### What I decided or changed myself
+- Provided the Strava export and asked for it to be used
+- Confirmed "Workout" was mostly gym; identified the 324-min activity as a party (skip)
+- Chose to keep table tennis matches as their own sport type (`table_tennis_match`) for logging from now on
+- _(add anything else here)_

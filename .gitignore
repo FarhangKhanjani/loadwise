@@ -5,6 +5,9 @@
 *.db
 *.db-journal
 
+# Personal exports (Strava etc.). Only the synthetic sample CSVs are committed.
+data/private/
+
 # Agent logs (contain training and wellness data)
 logs/
 

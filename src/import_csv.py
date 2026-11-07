@@ -84,6 +84,25 @@ def parse_wellness_row(row: dict) -> dict:
 
 # ---------- import ----------
 
+def add_session_if_new(db: Session, data: dict) -> bool:
+    """Add a session unless an identical one (date, sport, duration, RPE) exists. Returns True if added.
+
+    Shared by every importer so they all deduplicate the same way. Does not commit.
+    """
+    exists = db.scalar(
+        select(TrainingSession.id).where(
+            TrainingSession.date == data["date"],
+            TrainingSession.sport_type == data["sport_type"],
+            TrainingSession.duration_min == data["duration_min"],
+            TrainingSession.rpe == data["rpe"],
+        )
+    )
+    if exists:
+        return False
+    db.add(TrainingSession(**data))
+    return True
+
+
 def import_sessions(db: Session, path: Path) -> ImportReport:
     report = ImportReport()
     with path.open(newline="", encoding="utf-8") as f:
@@ -95,19 +114,10 @@ def import_sessions(db: Session, path: Path) -> ImportReport:
                 report.errors.append(f"{path.name} line {line_no}: {e}")
                 continue
 
-            exists = db.scalar(
-                select(TrainingSession.id).where(
-                    TrainingSession.date == data["date"],
-                    TrainingSession.sport_type == data["sport_type"],
-                    TrainingSession.duration_min == data["duration_min"],
-                    TrainingSession.rpe == data["rpe"],
-                )
-            )
-            if exists:
+            if add_session_if_new(db, data):
+                report.inserted += 1
+            else:
                 report.skipped += 1
-                continue
-            db.add(TrainingSession(**data))
-            report.inserted += 1
     db.commit()
     return report
 

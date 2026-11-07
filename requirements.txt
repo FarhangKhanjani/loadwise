@@ -3,6 +3,8 @@
 # Phase 1: storage and config
 SQLAlchemy==2.1.8
 python-dotenv==1.2.4
+# IANA time zone database for zoneinfo (Windows ships without one)
+tzdata==2026.6
 
 # Tests
 pytest==9.2.0
