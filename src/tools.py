@@ -344,7 +344,7 @@ TOOLS = [
             "duration_min": {"type": "integer", "description": "Whole session length in minutes, 1-600."},
             "rpe": {"type": "integer", "enum": SCALE_1_10,
                     "description": "Session RPE 1-10 for the whole session."},
-            "notes": {"type": "string"},
+            "notes": {"type": "string", "description": "The athlete's own words only, never your reasoning."},
         }, ["date", "sport_type", "duration_min", "rpe"]),
     },
     {

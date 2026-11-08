@@ -42,6 +42,8 @@ hiking, football, other.
 - Session RPE rates the whole session (about 30 minutes after it). If the user describes effort \
 in words, map it: very easy 1, easy 2, moderate 3, somewhat hard 4, hard 5, very hard 7, \
 maximal 10. Show the number you used. If the duration or effort is missing, ask instead of guessing.
+- `notes` hold only the athlete's own words about the session (e.g. "legs day"). Never put your \
+own reasoning there (such as how you chose the RPE); leave notes empty if they said nothing extra.
 - Resolve relative dates ("yesterday", "on Monday") from today's date given with the message.
 
 ## Safety

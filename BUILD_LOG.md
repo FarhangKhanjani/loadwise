@@ -179,3 +179,38 @@ All code, tests, the system prompt and this entry.
 - Chose Claude Haiku 5.5 as the default model for cost, after asking whether a free or local model was possible
 - Created the Anthropic API key and `.env`
 - _(add anything else here)_
+
+---
+
+## Phase 4: Telegram bot and confirmations (2026-11-08)
+
+### What was built
+- `src/bot.py`: Telegram bot with `python-telegram-bot` 22.8 (`python -m src.bot`, optional `--db`, `--as-of`, `--model`)
+  - `/log [today|yesterday|YYYY-MM-DD] <sport> <minutes> <rpe> [notes]`, with short names `tt` and `match`
+  - `/wellness [date] <sleep> <soreness> <fatigue> <stress> [resting HR]` (accepts `7,5`)
+  - `/status`: load metrics, last session and active flags, without the LLM (free)
+  - `/reset`, `/help`, a command menu, and free text that goes to the agent
+  - Confirm/Reject buttons for every proposal, from commands and from the agent
+- Setup mode: while `TELEGRAM_CHAT_ID` is unset, the bot only replies with the sender's chat id
+- Prompt fix from the Phase 3 observations: session `notes` hold only the athlete's own words
+- `tests/test_bot.py` (52 tests); the fake Claude client moved to `tests/fakes.py`, shared with the agent tests. 180 tests in total.
+
+### Key decisions
+- **One authorized chat.** A guard handler runs before every other handler (group -1) and drops updates from any other chat. Nobody else can read the data or spend API credit by finding the bot.
+- **Commands go through confirmation too.** `/log` and `/wellness` create the same pending action as the agent, so `confirm_action()` remains the only code path that saves data, and a typo like `/log gym 900 7` is caught before it is saved. The cost is one extra tap.
+- **Commands reuse the tools' validation.** The parser only checks the format; ranges, future dates and duplicate wellness are checked by `log_session` / `log_wellness`, which the agent also uses. That gives one set of rules.
+- **Buttons survive a restart.** The button data is `confirm:<id>`, and the proposal lives in the database, not in memory.
+- **Long polling instead of webhooks**, so no public URL or open port is needed.
+- **The agent runs in a worker thread** (`asyncio.to_thread`). The Claude call blocks for seconds, and on the event loop it would freeze the whole bot. A lock allows one agent turn at a time, because the conversation history is a plain list.
+- **The conversation resets after 1 hour idle**, so old history doesn't make every request longer and more expensive.
+- **Markdown is converted to Telegram HTML** with escaping, falling back to plain text if Telegram rejects it. Telegram's Markdown mode would need every `.`, `(` and `-` escaped. Long answers are split at line breaks.
+- **httpx logging is set to WARNING**, because its INFO lines include the request URL, and Telegram URLs contain the bot token.
+- **Edited messages are ignored**, so editing an old `/log` message can't create a second proposal.
+- `/status` repeats the "missing data is not rest" warning after 3 or more days without a session.
+
+### What the AI generated
+All code, tests and this entry.
+
+### What I decided or changed myself
+- Approved the plan, including confirmation for direct commands
+- _(add anything else here)_
