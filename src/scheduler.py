@@ -1,7 +1,8 @@
 """The daily check: run the rules every morning and send new flags to Telegram.
 
 Schedule: 08:00 Europe/Vienna, plus once shortly after startup (so a PC that was off at
-08:00 still gets its alerts). Running the check more than once is safe; see below.
+08:00 still gets its alerts). A PC that was asleep at 08:00 runs the check on wake-up.
+Running the check more than once is safe; see below.
 
 Which flags become alerts (alert_candidates):
 - Load flags (spike, elevated, undertraining, monotony) only when all 4 weeks of the ACWR
@@ -147,11 +148,18 @@ async def daily_check(context) -> None:
 
 def schedule_daily_check(application, timezone: str) -> None:
     """08:00 local time every day (time-zone aware, so daylight saving time is handled),
-    plus one run 10 seconds after startup."""
+    plus one run 10 seconds after startup.
+
+    A late run still runs: APScheduler by default drops a run that starts more than 1 s
+    late, so a laptop asleep at 08:00 silently skipped the day's check (seen live on
+    2026-11-09). misfire_grace_time=None runs it on wake-up instead, and coalesce=True
+    turns several missed runs into one. Running late or twice is safe: see the cooldown.
+    """
     jobs = application.job_queue
     if jobs is None:  # pragma: no cover
         raise RuntimeError("JobQueue missing: install python-telegram-bot[job-queue]")
-    jobs.run_daily(daily_check, time=CHECK_TIME.replace(tzinfo=ZoneInfo(timezone)), name="daily_check")
+    jobs.run_daily(daily_check, time=CHECK_TIME.replace(tzinfo=ZoneInfo(timezone)), name="daily_check",
+                   job_kwargs={"misfire_grace_time": None, "coalesce": True})
     jobs.run_once(daily_check, when=10, name="startup_check")
 
 

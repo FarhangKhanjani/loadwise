@@ -329,6 +329,9 @@ def test_daily_check_is_scheduled_at_8_vienna_time_and_after_startup():
     trigger = jobs["daily_check"].job.trigger
     assert trigger.timezone == ZoneInfo("Europe/Vienna")
     assert "hour='8', minute='0'" in str(trigger)
+    # A PC asleep at 08:00 must run the check on wake-up, once, instead of skipping the day.
+    assert jobs["daily_check"].job.misfire_grace_time is None
+    assert jobs["daily_check"].job.coalesce is True
 
 
 def test_bot_uses_the_fixed_demo_date(state):

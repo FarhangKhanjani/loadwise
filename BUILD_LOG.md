@@ -249,6 +249,12 @@ All code, tests and this entry.
 - Demo data (a copy of `demo.db`), 2026-02-15, `--send` twice: the first run stored 4 alerts and sent **one** Telegram message; the second run sent nothing.
 - `python -m src.main` on real data: the startup check ran (0 new alerts), `/health` returned `{"status": "ok", "bot": "running", ...}`, and `/metrics` without a configured key returned 503.
 
+### Bug found by running it live (fixed after the Phase 5 commit)
+- **The 08:00 check was skipped on 2026-11-09.** The PC was asleep at 08:00. On wake-up at 10:50, APScheduler logged "Run time of job daily_check ... was missed by 2:50:18" and dropped the run, because by default it skips any run that starts more than 1 second late. All tests had passed; only the live run showed this.
+- **Fix:** the daily job is created with `misfire_grace_time=None` (run however late) and `coalesce=True` (several missed runs become one). Running late or twice is safe because of the 7-day cooldown. A test checks both settings; it fails without the fix.
+- After a restart, the check for 2026-11-09 ran at 12:04: 0 alerts, as expected for the current data.
+- The `getaddrinfo failed` errors in the same log were the network reconnecting after sleep; Telegram polling retries them by itself.
+
 ### What the AI generated
 All code, tests and this entry.
 
