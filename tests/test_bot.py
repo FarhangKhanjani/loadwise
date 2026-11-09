@@ -128,7 +128,7 @@ def test_parse_wellness_errors(args, message):
 def test_log_command_only_proposes(ctx):
     sessions_before = count(ctx.db, TrainingSession)
     result = propose_from_command(ctx, "log", ["padel", "75", "6"])
-    assert result["summary"] == "Log padel, 75 min, RPE 6 on 2026-02-15"
+    assert result["summary"] == "Log padel, 75 min, RPE 6 (load 450) on 2026-02-15"
     assert ctx.db.get(PendingAction, result["pending_action_id"]).status == "proposed"
     assert count(ctx.db, TrainingSession) == sessions_before
 
@@ -202,8 +202,8 @@ def test_confirm_button_saves_and_tells_the_agent(ctx):
 
     decision = decide(ctx.db, action_id, confirm=True)
 
-    assert decision.text == "✅ Saved: Log gym, 60 min, RPE 7 on 2026-02-15 (legs)"
-    assert decision.note == f"User confirmed pending action {action_id}: Log gym, 60 min, RPE 7 on 2026-02-15 (legs)"
+    assert decision.text == "✅ Saved: Log gym, 60 min, RPE 7 (load 420) on 2026-02-15 (legs)"
+    assert decision.note == f"User confirmed pending action {action_id}: Log gym, 60 min, RPE 7 (load 420) on 2026-02-15 (legs)"
     assert count(ctx.db, TrainingSession) == before + 1
 
 
@@ -311,7 +311,7 @@ def test_agent_proposal_comes_back_with_a_summary_and_can_be_confirmed(state):
 
     assert "Waiting for your confirmation" in reply.text
     [(action_id, summary)] = proposals
-    assert summary == "Log padel, 75 min, RPE 6 on 2026-02-15"
+    assert summary == "Log padel, 75 min, RPE 6 (load 450) on 2026-02-15"
     with state.session_factory() as db:
         before = count(db, TrainingSession)
         assert decide(db, action_id, confirm=True).text.startswith("✅ Saved")

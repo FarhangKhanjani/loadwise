@@ -24,3 +24,6 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Eval run outputs (transcripts, per-run results). The headline numbers go in evals/RESULTS.md.
+evals/results/

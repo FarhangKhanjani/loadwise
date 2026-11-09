@@ -65,7 +65,7 @@ def test_post_session_only_proposes(client, bot_state):
     assert response.status_code == 202
     body = response.json()
     assert body["status"] == "proposed" and body["telegram_sent"] is False
-    assert body["summary"] == "Log padel, 75 min, RPE 6 on 2026-02-15 (evening)"
+    assert body["summary"] == "Log padel, 75 min, RPE 6 (load 450) on 2026-02-15 (evening)"
     assert count(bot_state, TrainingSession) == before  # nothing saved until confirmed
     assert count(bot_state, PendingAction) == 1
 

@@ -261,3 +261,41 @@ All code, tests and this entry.
 ### What I decided or changed myself
 - Approved the data coverage rule, the 7-day cooldown, and adding FastAPI in this phase
 - _(add anything else here)_
+
+---
+
+## Phase 6: Evaluation (2026-11-09)
+
+### What was built
+- `evals/scenarios.json`: 20 scenarios in 4 categories (metrics, logging, safety, robustness). Each has a dataset, a fixed "today", the user's message and its checks.
+- `evals/datasets.py`: `sample`, `empty`, and `gap` (the real November situation: one session after months without logs, ACWR 4.0)
+- `evals/checks.py`: automatic checks for tools called, required numbers, required and forbidden text, the proposal's fields and notes. Three global checks run on every scenario: completed, numbers_grounded (no made-up numbers) and no_saved_claim.
+- `evals/run_evals.py`:
+  - Runs the real `Agent` with a fresh in-memory database per run, 3 reps, 4 workers.
+  - Records tokens, cost, latency and the model that actually answered.
+  - Puts API errors in `errors.jsonl` instead of scoring them.
+  - Saves every transcript.
+  - `--regrade` grades a saved run again for free.
+- `evals/RESULTS.md`: results, the failures, how the grader was checked, and limitations
+- `tests/test_evals.py` (40 tests): known good and bad answers, a do-nothing answer that fails all 20 scenarios, real false positives as regression tests, and the runner tested with a fake client
+
+### Results
+- **Final run: Haiku 5.5 60/60 (100%, 95% CI 94–100%) for $0.02; Opus 5.5 59/60 (98%) for $0.82** (38× the cost). Opus's one failure was a rounded summary ("around 400–580") instead of exact tool values.
+- **The eval found a real bug.** In run 1 (both models 58/60), the agent calculated session loads itself ("75 × 5 = 375") after proposing a session, against the prompt rule. Cause: `log_session` didn't return the load. Fix: it now returns `session_load`, and the proposal you confirm shows "(load 375)". In run 2, all 30 logging runs pass.
+- The Phase 3 observations: the "overall" question now mentions sleep and soreness (6/6). Notes contain only the user's words (6/6 padel runs). Knee pain is referred to a doctor or physio with no diagnosis (6/6).
+
+### Key decisions
+- **Automatic checks, no LLM judge:** reproducible, free and explainable. The weak spot is safety wording, so those answers were read by hand.
+- **No made-up numbers, checked on every scenario:** every number in a reply must appear in a tool result, the user's message, today's date or the system prompt. This also catches the agent calculating metrics itself.
+- **The grader was checked before the numbers were trusted.** The first grader scored Haiku 73% and Opus 65%. Reading every failure showed that most were grader mistakes: negations ("doesn't mean you will get injured"), descriptions of data ("nothing has been logged"), emergency numbers (112), dates resolved from today, and quoted examples of what to type. Each fix got the real reply as a regression test, and the saved runs were regraded without new API calls.
+- **Infrastructure errors are not model failures.** Each response's model is checked against the requested model.
+- **Uncertainty stated next to the results** as a Wilson 95% interval, because the usual "± margin" collapses to ±0 at 100%. The intervals overlap, so the eval can't separate Haiku from Opus. It does support Haiku as the default.
+- **Fix the tool, not the prompt:** the agent calculated loads because the tool didn't give it one. Returning the value removed the reason to calculate, without adding another prompt rule.
+- Total cost of the phase: about $1.66 (two full runs per model plus a smoke test).
+
+### What the AI generated
+The harness, scenarios, graders, tests, the results write-up and this entry. The first grader version had the false positives described above; they were found by reading the transcripts, not by the tests.
+
+### What I decided or changed myself
+- Approved the plan: 20 scenarios, automatic checks, Haiku and Opus with 3 reps
+- _(add anything else here)_

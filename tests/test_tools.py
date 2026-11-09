@@ -128,7 +128,8 @@ def test_log_session_only_proposes_until_confirmed(ctx):
     result = log_session(ctx, "2026-02-15", "padel", 75, 6, "evening game")
 
     assert result["status"] == "proposed"
-    assert "padel, 75 min, RPE 6" in result["summary"]
+    assert "padel, 75 min, RPE 6 (load 450)" in result["summary"]
+    assert result["session_load"] == 450  # so the agent quotes it instead of calculating it
     assert count(ctx.db, TrainingSession) == sessions_before  # nothing saved yet
 
     assert confirm_action(ctx.db, result["pending_action_id"]) == "confirmed"

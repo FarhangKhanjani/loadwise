@@ -221,7 +221,10 @@ def log_session(ctx: ToolContext, date: str, sport_type: str, duration_min: int,
     _check_range(rpe, "rpe", 1, 10)
     payload = {"date": day.isoformat(), "sport_type": sport_type, "duration_min": duration_min,
                "rpe": rpe, "notes": notes or None}
-    return _propose(ctx, "log_session", payload, describe_payload("log_session", payload))
+    # The load is returned so the agent can quote it instead of calculating it itself
+    # (the Phase 6 evals caught it doing "75 x 5 = 375" when the tool gave no load).
+    return {**_propose(ctx, "log_session", payload, describe_payload("log_session", payload)),
+            "session_load": session_load(duration_min, rpe)}
 
 
 def log_wellness(ctx: ToolContext, date: str, sleep_hours: float, soreness: int, fatigue: int,
@@ -253,7 +256,8 @@ def describe_payload(action_type: str, p: dict) -> str:
     """One human-readable line, shown to the user before they confirm."""
     if action_type == "log_session":
         note = f" ({p['notes']})" if p.get("notes") else ""
-        return f"Log {p['sport_type']}, {p['duration_min']} min, RPE {p['rpe']} on {p['date']}{note}"
+        load = session_load(p["duration_min"], p["rpe"])
+        return f"Log {p['sport_type']}, {p['duration_min']} min, RPE {p['rpe']} (load {load}) on {p['date']}{note}"
     if action_type == "log_wellness":
         hr = f", resting HR {p['resting_hr']}" if p.get("resting_hr") is not None else ""
         return (f"Log wellness for {p['date']}: sleep {p['sleep_hours']:g} h, soreness {p['soreness']}, "
