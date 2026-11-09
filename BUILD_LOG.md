@@ -214,3 +214,44 @@ All code, tests and this entry.
 ### What I decided or changed myself
 - Approved the plan, including confirmation for direct commands
 - _(add anything else here)_
+
+---
+
+## Phase 5: Daily check, alerts and HTTP API (2026-11-08)
+
+### What was built
+- `src/scheduler.py`: the daily check
+  - `alert_candidates` decides which flags become alerts; `run_check` stores new alerts with the cooldown; `send_unsent` delivers them
+  - The `daily_check` job runs at 08:00 Europe/Vienna and once 10 s after startup
+  - CLI: `python -m src.scheduler [--db] [--as-of] [--send]`, a dry run by default
+- Data coverage: `rules.weeks_with_sessions()`, and `weeks_with_sessions_28d` in the `get_load_summary` and `get_active_flags` results. `/status` and the agent's prompt warn when weeks of the ACWR window are empty.
+- `src/api.py` (FastAPI):
+  - `GET /health`
+  - `GET /metrics`, `GET /flags`
+  - `POST /sessions`, which creates a proposal and sends Confirm/Reject buttons to Telegram
+- `src/main.py`: one process. uvicorn serves the API, and the API's lifespan starts the bot and the scheduler.
+- Dependencies: `python-telegram-bot[job-queue]` (APScheduler 3.11), `fastapi` 0.162, `uvicorn` 0.54. New settings: `API_KEY`, `API_HOST`, `API_PORT`.
+- Tests: `test_scheduler.py` (26), `test_api.py` (16), plus coverage, `/status` and scheduling tests. 224 tests in total.
+
+### Key decisions
+- **Load alerts need data in all 4 weeks of the ACWR window.** Found on the real history: logging stopped on Jul 26, and one gym session on Nov 8 gave ACWR 4.0, a "spike" that is only missing data. Load flags (spike, elevated, undertraining, monotony) are alerted only when every 7-day block of the last 28 days has a logged session. Sleep and soreness alerts don't depend on load history and are always sent. Trade-off: after a real break, load alerts are paused for up to 4 weeks.
+- **No undertraining alert during a logging gap** (3 or more days without a session). Instead there is one "no recent data" reminder per gap, not one per week.
+- **One alert per flag type per 7 days.** A spike lasting 5 days gives one alert. An escalation (elevated, then spike) is a different flag type, so it alerts. The rule only looks at past alerts, so it still works after the bot was off for a few days.
+- **Store first, send second.** An alert is saved with `sent = false`, sent, then marked as sent. If Telegram is down, it stays unsent and is retried on the next run. Exactly-once delivery isn't possible over a network; the remaining risk is a duplicate if the process crashes between sending and marking it.
+- **No LLM in alerts.** The text comes from the rules: free, no invented numbers, and it works when the Claude API is down.
+- **The scheduler is python-telegram-bot's JobQueue** (APScheduler underneath). It shares the bot's event loop and Telegram connection. The time is time-zone aware, so daylight saving time is handled, and the check also runs at startup in case the PC was off at 08:00.
+- **One process: FastAPI's lifespan starts the bot**, by hand with `initialize`, `start` and `start_polling`, because `run_polling()` would want to own the event loop. This is the process Docker will run in Phase 7.
+- **The API is closed by default.** It listens on `127.0.0.1`, and every endpoint except `/health` needs `X-API-Key`, compared with `secrets.compare_digest`. Without an `API_KEY` of at least 16 characters, those endpoints return 503 instead of being open.
+- **`POST /sessions` only proposes.** `confirm_action()` remains the only path that saves data, even through the API.
+
+### Verification
+- Real data (`data/loadwise.db`), dry run: 0 alerts on Nov 8 and Nov 9, even though ACWR is 4.0, because only 1 of 4 weeks has sessions.
+- Demo data (a copy of `demo.db`), 2026-02-15, `--send` twice: the first run stored 4 alerts and sent **one** Telegram message; the second run sent nothing.
+- `python -m src.main` on real data: the startup check ran (0 new alerts), `/health` returned `{"status": "ok", "bot": "running", ...}`, and `/metrics` without a configured key returned 503.
+
+### What the AI generated
+All code, tests and this entry.
+
+### What I decided or changed myself
+- Approved the data coverage rule, the 7-day cooldown, and adding FastAPI in this phase
+- _(add anything else here)_

@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from src.import_csv import add_session_if_new
 from src.metrics import compute_load_metrics, daily_loads, session_load
 from src.models import PendingAction, TrainingSession, Wellness
-from src.rules import evaluate_flags
+from src.rules import evaluate_flags, weeks_with_sessions
 
 SPORT_TYPES = [
     "gym", "table_tennis", "table_tennis_match", "padel",
@@ -120,6 +120,7 @@ def get_load_summary(ctx: ToolContext, days: int = 7, as_of: str | None = None) 
         "acwr": _r(metrics.acwr) if metrics else None,
         "monotony_7d": _r(metrics.monotony) if metrics else None,
         "strain_7d": _r(metrics.strain, 0) if metrics else None,
+        "weeks_with_sessions_28d": weeks_with_sessions(daily, day) if metrics else None,
         "note": note,
         **_freshness(ctx.db, day),
     }
@@ -185,6 +186,7 @@ def get_active_flags(ctx: ToolContext, as_of: str | None = None) -> dict:
         "as_of": day.isoformat(),
         "acwr": _r(metrics.acwr),
         "monotony_7d": _r(metrics.monotony),
+        "weeks_with_sessions_28d": weeks_with_sessions(daily, day),
         "flags": [{"flag_type": f.flag_type, "severity": f.severity, "message": f.message} for f in flags],
         **_freshness(ctx.db, day),
     }

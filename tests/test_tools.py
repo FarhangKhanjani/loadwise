@@ -57,6 +57,7 @@ def test_load_summary_on_spike_day_has_real_numbers(ctx):
     assert len(result["daily_loads"]) == 7
     assert result["daily_loads"][-1] == {"date": "2026-02-15", "load": 805}
     assert result["days_since_last_session"] == 0
+    assert result["weeks_with_sessions_28d"] == 4
     assert result["note"] is None
 
 

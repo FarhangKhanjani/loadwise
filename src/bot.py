@@ -52,6 +52,8 @@ from telegram.ext import (
 from src.agent import Agent, AgentReply
 from src.config import get_settings
 from src.models import PendingAction
+from src.rules import COVERAGE_WEEKS
+from src.scheduler import schedule_daily_check
 from src.tools import (
     SPORT_TYPES,
     ToolContext,
@@ -237,6 +239,11 @@ def format_status(summary: dict, flags: dict) -> str:
         if days >= 3:
             lines.append(f"⚠️ Nothing logged for {days} days. Missing sessions count as rest, "
                          f"so the numbers may be lower than your real load.")
+    weeks = summary["weeks_with_sessions_28d"]
+    if weeks is not None and weeks < COVERAGE_WEEKS:
+        lines.append(f"⚠️ Only {weeks} of the last {COVERAGE_WEEKS} weeks have logged sessions, so ACWR "
+                     f"may compare against unlogged weeks. Load alerts are paused until all "
+                     f"{COVERAGE_WEEKS} weeks have data.")
 
     lines.append("")
     if flags["flags"]:
@@ -255,6 +262,17 @@ def status_text(ctx: ToolContext) -> str:
 
 def callback_data(confirm: bool, action_id: int) -> str:
     return f"{'confirm' if confirm else 'reject'}:{action_id}"
+
+
+def proposal_text(summary: str) -> str:
+    return f"Confirm?\n{summary}"
+
+
+def proposal_buttons(action_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Confirm", callback_data=callback_data(True, action_id)),
+        InlineKeyboardButton("❌ Reject", callback_data=callback_data(False, action_id)),
+    ]])
 
 
 def parse_callback(data: str) -> tuple[bool, int]:
@@ -412,11 +430,7 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _send_proposal(update: Update, action_id: int, summary: str) -> None:
-    buttons = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Confirm", callback_data=callback_data(True, action_id)),
-        InlineKeyboardButton("❌ Reject", callback_data=callback_data(False, action_id)),
-    ]])
-    await update.effective_message.reply_text(f"Confirm?\n{summary}", reply_markup=buttons)
+    await update.effective_message.reply_text(proposal_text(summary), reply_markup=proposal_buttons(action_id))
 
 
 async def _propose(update: Update, context: ContextTypes.DEFAULT_TYPE, command: str) -> None:
@@ -505,7 +519,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text("Something went wrong. Check the bot logs.")
 
 
-async def _set_command_menu(application: Application) -> None:
+async def set_command_menu(application: Application) -> None:
     """The list Telegram shows when you type '/'."""
     await application.bot.set_my_commands([
         BotCommand("log", "Propose a training session"),
@@ -517,7 +531,7 @@ async def _set_command_menu(application: Application) -> None:
 
 
 def build_application(token: str, state: BotState, allowed_chat_id: int) -> Application:
-    app = ApplicationBuilder().token(token).post_init(_set_command_menu).build()
+    app = ApplicationBuilder().token(token).post_init(set_command_menu).build()
     app.bot_data.update(state=state, allowed_chat_id=allowed_chat_id)
     app.add_handler(TypeHandler(Update, guard), group=-1)
     # New messages only: editing an old "/log ..." message must not create a second proposal.
@@ -529,6 +543,7 @@ def build_application(token: str, state: BotState, allowed_chat_id: int) -> Appl
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & new, on_text))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_error_handler(on_error)
+    schedule_daily_check(app, state.timezone)
     return app
 
 

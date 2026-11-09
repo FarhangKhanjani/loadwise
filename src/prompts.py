@@ -32,6 +32,9 @@ Strain = weekly load x monotony.
 Days without logs count as rest in the metrics. Tool results include `days_since_last_session`. \
 If it is 3 or more, or the week looks empty, say that sessions may not have been logged before \
 concluding the athlete is undertraining, and suggest logging them.
+`weeks_with_sessions_28d` counts the last 4 weeks that have any logged session. Below 4, ACWR \
+compares against weeks that may just be unlogged: say so before calling anything a spike or \
+undertraining.
 
 ## Logging and changes need confirmation
 - To log a session, wellness entry or plan change, call log_session, log_wellness or \

@@ -13,6 +13,7 @@ from src.bot import (
     BotState,
     CommandError,
     api_error_message,
+    build_application,
     callback_data,
     decide,
     is_authorized,
@@ -27,12 +28,10 @@ from src.bot import (
     split_message,
     status_text,
 )
-from src.db import init_db, make_engine, make_session_factory
-from src.import_csv import import_sessions, import_wellness
+from src.db import make_engine, make_session_factory
 from src.models import PendingAction, TrainingSession, Wellness
-from src.tools import ToolContext, log_wellness
-from tests.conftest import DATA
-from tests.fakes import FakeClient, response, text, tool_use
+from src.tools import ToolContext
+from tests.fakes import response, text, tool_use
 
 TODAY = date(2026, 2, 15)  # the spike day in the sample data
 
@@ -166,6 +165,17 @@ def test_status_warns_when_nothing_was_logged_recently(sample_db):
     assert "Nothing logged for 15 days" in out
 
 
+def test_status_warns_when_weeks_of_the_acwr_window_are_empty(db):
+    # Like the real history: logging stopped months ago, then one session today.
+    db.add_all([TrainingSession(date=date(2025, 11, 1), sport_type="gym", duration_min=60, rpe=6),
+                TrainingSession(date=TODAY, sport_type="gym", duration_min=60, rpe=7)])
+    db.commit()
+    out = status_text(ToolContext(db=db, today=TODAY))
+    assert "ACWR: 4.00" in out
+    assert "Only 1 of the last 4 weeks have logged sessions" in out
+    assert "Load alerts are paused" in out
+
+
 def test_status_on_empty_database(db):
     out = status_text(ToolContext(db=db, today=TODAY))
     assert "ACWR: n/a" in out
@@ -286,16 +296,8 @@ def test_api_errors_get_friendly_messages():
 # ---------- agent turns through the bot ----------
 
 @pytest.fixture
-def state(tmp_path):
-    """BotState over a file database with the sample data (each turn opens its own session)."""
-    engine = make_engine(str(tmp_path / "bot.db"))
-    init_db(engine)
-    factory = make_session_factory(engine)
-    with factory() as db:
-        import_sessions(db, DATA / "sample_sessions.csv")
-        import_wellness(db, DATA / "sample_wellness.csv")
-    yield BotState(factory, Agent(FakeClient([]), "test-model", log_path=None), as_of=TODAY)
-    engine.dispose()
+def state(bot_state):
+    return bot_state
 
 
 def test_agent_proposal_comes_back_with_a_summary_and_can_be_confirmed(state):
@@ -314,6 +316,19 @@ def test_agent_proposal_comes_back_with_a_summary_and_can_be_confirmed(state):
         before = count(db, TrainingSession)
         assert decide(db, action_id, confirm=True).text.startswith("✅ Saved")
         assert count(db, TrainingSession) == before + 1
+
+
+def test_daily_check_is_scheduled_at_8_vienna_time_and_after_startup():
+    from zoneinfo import ZoneInfo
+
+    state = BotState(make_session_factory(make_engine(":memory:")), Agent(None, "x", log_path=None))
+    app = build_application("123456:TEST-TOKEN", state, allowed_chat_id=1)  # no network at build time
+
+    jobs = {job.name: job for job in app.job_queue.jobs()}
+    assert set(jobs) == {"daily_check", "startup_check"}
+    trigger = jobs["daily_check"].job.trigger
+    assert trigger.timezone == ZoneInfo("Europe/Vienna")
+    assert "hour='8', minute='0'" in str(trigger)
 
 
 def test_bot_uses_the_fixed_demo_date(state):

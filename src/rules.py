@@ -108,6 +108,25 @@ def evaluate_flags(
     return metrics, [f for f in candidates if f is not None]
 
 
+# ---------- data coverage ----------
+
+COVERAGE_WEEKS = 4  # ACWR compares this week with the last 4
+LOAD_FLAG_TYPES = {"high_load_spike", "elevated_load", "undertraining", "high_monotony"}
+
+
+def weeks_with_sessions(daily: Mapping[date, int], as_of: date) -> int:
+    """How many of the 4 seven-day blocks ending on as_of contain a logged session.
+
+    Missing logs look like rest days to the metrics. After a logging gap, one session
+    against an empty chronic window gives ACWR 4.0, a "spike" that is really missing data.
+    Load flags are only trustworthy when every week of the window has data.
+    """
+    return sum(
+        any(daily.get(as_of - timedelta(days=7 * week + day), 0) > 0 for day in range(7))
+        for week in range(COVERAGE_WEEKS)
+    )
+
+
 def main() -> None:
     import argparse
 

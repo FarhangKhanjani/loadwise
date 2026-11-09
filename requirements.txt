@@ -9,8 +9,12 @@ tzdata==2026.6
 # Phase 3: agent (Claude API)
 anthropic==2.6.0
 
-# Phase 4: Telegram bot
-python-telegram-bot==22.8
+# Phase 4: Telegram bot. Phase 5: the job-queue extra adds APScheduler for the daily check
+python-telegram-bot[job-queue]==22.8
+
+# Phase 5: HTTP API
+fastapi==0.162.2
+uvicorn==0.54.0
 
 # Tests
 pytest==9.2.0

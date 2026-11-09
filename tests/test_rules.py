@@ -14,6 +14,7 @@ from src.rules import (
     high_soreness_flag,
     monotony_flag,
     poor_sleep_flag,
+    weeks_with_sessions,
 )
 
 AS_OF = date(2026, 2, 28)
@@ -135,6 +136,24 @@ def test_evaluate_flags_without_enough_history_skips_acwr_but_checks_wellness():
     metrics, flags = evaluate_flags(daily, wellness, AS_OF, history_start=days_before(10))
     assert metrics.acwr is None
     assert [f.flag_type for f in flags] == ["high_soreness"]
+
+
+# ---------- data coverage: weeks of the ACWR window with logged sessions ----------
+
+@pytest.mark.parametrize("days_with_load, expected", [
+    ([], 0),
+    ([0, 7, 14, 21], 4),       # one session in each 7-day block
+    ([0, 8, 27], 3),           # blocks 0, 1 and 3; block 2 (days 14-20) empty
+    ([0, 1, 2, 3, 4, 5, 6], 1),  # a busy week after a gap is still only 1 week
+    ([28], 0),                 # day 28 is outside the 4 weeks
+])
+def test_weeks_with_sessions(days_with_load, expected):
+    daily = {days_before(n): 300 for n in days_with_load}
+    assert weeks_with_sessions(daily, AS_OF) == expected
+
+
+def test_zero_load_days_are_not_sessions():
+    assert weeks_with_sessions({days_before(0): 0}, AS_OF) == 0
 
 
 # ---------- the real sample data ----------
