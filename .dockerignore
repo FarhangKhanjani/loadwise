@@ -1,0 +1,23 @@
+# Never send secrets or personal data into the image build.
+.env
+*.db
+*.db-journal
+data/private/
+logs/
+evals/results/
+
+# Not needed at runtime
+.venv/
+.git/
+.github/
+tests/
+evals/
+scripts/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.vscode/
+.idea/
+*.md

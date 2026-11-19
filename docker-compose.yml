@@ -1,0 +1,25 @@
+# docker compose up -d --build    start (rebuilds after code changes)
+# docker compose logs -f          follow the logs
+# docker compose down             stop
+#
+# Only ONE copy of the bot may run: stop any `python -m src.main` / `python -m src.bot`
+# on your PC first, or Telegram rejects the second one with a "Conflict" error.
+services:
+  loadwise:
+    build: .
+    container_name: loadwise
+    # Secrets come from your local .env at start-up; they are never baked into the image.
+    env_file: .env
+    environment:
+      # Fixed paths inside the container (override what .env says for local runs).
+      DB_PATH: /app/data/loadwise.db
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+    volumes:
+      # Your real database and logs stay on your disk and survive rebuilds.
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      # 127.0.0.1 only: the API (health data) is reachable from this PC, not the network.
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped

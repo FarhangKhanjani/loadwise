@@ -299,3 +299,46 @@ The harness, scenarios, graders, tests, the results write-up and this entry. The
 ### What I decided or changed myself
 - Approved the plan: 20 scenarios, automatic checks, Haiku and Opus with 3 reps
 - _(add anything else here)_
+
+---
+
+## Phase 7: Docker, CI and README (2026-11-19)
+
+### What was built
+- `Dockerfile`:
+  - `python:3.12-slim`, running as a non-root user
+  - only the runtime dependencies
+  - a `HEALTHCHECK` on `/health`, using Python's `urllib` because the slim image has no curl
+  - starts with `python -m src.main`
+- `docker-compose.yml`:
+  - `env_file: .env`, so secrets are passed in when the container starts, never built into the image
+  - `./data` and `./logs` mounted from the host
+  - port published on `127.0.0.1` only
+  - `restart: unless-stopped`
+- `.dockerignore`: keeps `.env`, `*.db`, `data/private/`, logs and eval results out of the build
+- `requirements.txt` is now runtime only; test tools are in `requirements-dev.txt`
+- `.github/workflows/tests.yml`: runs `pytest` (no secrets needed) and `docker build` on every push
+- `README.md`:
+  - problem, Mermaid architecture and sequence diagrams
+  - metrics with a worked example, and eval results
+  - quick start (Docker and local), usage (Telegram, API, configuration)
+  - limitations, and "How I built this with AI"
+
+### Key decisions
+- **Secrets and personal data never enter the image.** They come from `.env` and the mounted `./data` at runtime, so the image could be shared without leaking anything.
+- **Localhost-only, by a different mechanism.** Inside a container the API has to listen on `0.0.0.0` to be reachable at all, so the "local only" protection moves to the port mapping `127.0.0.1:8000:8000`.
+- **CI also builds the image**, so the Dockerfile is checked on every push.
+- **The README is honest about limits:** ACWR's debated validity, missing data, estimated Strava RPE, a single user, and a small eval written by the same author as the prompt.
+
+### Verification
+- 265 tests pass locally.
+- Docker Desktop's engine would not start on this PC: no WSL distribution was set up. I decided to commit and let CI verify the image build on GitHub (`docker build` job).
+- **Still open:** running the container with real data. That means `docker compose up`, `/health`, `/status` from the phone, and data surviving a restart. Do it once Docker Desktop works.
+
+### What the AI generated
+The Docker files, the CI workflow, the README (including a draft of "How I built this with AI", based on this log and our conversation) and this entry.
+
+### What I decided or changed myself
+- Approved the plan, including CI and splitting the requirements
+- Chose to commit with the image build checked by CI, instead of waiting for Docker Desktop on my PC
+- _(add anything else here, and fill in the two ✏️ placeholders in the README)_

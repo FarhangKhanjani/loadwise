@@ -1,0 +1,6 @@
+# Everything to develop and test: the runtime dependencies plus test tools.
+#   pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest==9.2.0
+pytest-cov==7.1.0
