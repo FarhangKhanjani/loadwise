@@ -1,0 +1,21 @@
+name,kcal_per_100g,protein_per_100g,aliases,portions,source
+oats,379.0,13.15,haferflocken|hafer|oatmeal|porridge oats,1 cup=81,"USDA FoodData Central: Cereals, oats, regular and quick, not fortified, dry (173904)"
+milk,61.0,3.15,milch|whole milk|vollmilch,100 ml=103|1 cup=244,"USDA FoodData Central: Milk, whole, 3.25% milkfat, without added vitamin A and vitamin D (172217)"
+banana,89.0,1.09,banane|bananen,1 medium=118|1 small=101|1 large=136,"USDA FoodData Central: Bananas, raw (173944)"
+blueberries,57.0,0.74,heidelbeeren|blaubeeren,1 cup=148,"USDA FoodData Central: Blueberries, raw (171711)"
+mango,60.0,0.82,mangos,1 cup pieces=165,"USDA FoodData Central: Mangos, raw (169910)"
+strawberries,32.0,0.67,erdbeeren,,"USDA FoodData Central: Strawberries, raw (167762)"
+raspberries,52.0,1.2,himbeeren,,"USDA FoodData Central: Raspberries, raw (167755)"
+mixed berries,47.0,0.87,berries|beeren|beerenmix,,"USDA FoodData Central: Strawberries, raw (167762); Raspberries, raw (167755); Blueberries, raw (171711) (average)"
+egg,143.0,12.56,ei|eier|eggs,1 large=50|1 medium=44,"USDA FoodData Central: Egg, whole, raw, fresh (171287)"
+honey,304.0,0.3,honig,1 tbsp=21,USDA FoodData Central: Honey (169640)
+protein toast,285.0,21.0,eiweisstoast|eiweißtoast|protein bread|billa protein toast|toast,1 slice=26,package label: BILLA Protein Toast (520 g pack)
+tomato,18.0,0.88,tomate|paradeiser|tomatoes,1 medium=123|1/2 medium=61.5,"USDA FoodData Central: Tomatoes, red, ripe, raw, year round average (170457)"
+khiarshour,11.0,0.33,pickles|sour pickles|gurke|essiggurke|salzgurke,1 small=37,"USDA FoodData Central: Pickles, cucumber, sour (169379)"
+beef,130.0,21.64,rind|rindfleisch|meat|fleisch,,"USDA FoodData Central: Beef, chuck for stew, separable lean and fat, choice, raw (170810)"
+mixed vegetables,72.0,3.33,veggies|vegetables|gemüse|gemuese,,"USDA FoodData Central: Vegetables, mixed, frozen, unprepared (170471)"
+fries,168.0,2.66,pommes|pommes frites|french fries,,"USDA FoodData Central: Potatoes, french fried, all types, salt not added in processing, frozen, oven-heated (170118)"
+pasta,371.0,13.04,nudeln|spaghetti|penne|pasta dry,,"USDA FoodData Central: Pasta, dry, enriched (169736)"
+tomato sauce,50.0,1.39,tomatensauce|sugo|marinara|pasta sauce,,"USDA FoodData Central: Sauce, pasta, spaghetti/marinara, ready-to-serve (171192)"
+parmesan,420.0,28.42,parmesan cheese|parmesankäse,1 tbsp=5,"USDA FoodData Central: Cheese, parmesan, grated (171247)"
+olive oil,884.0,0.0,olivenöl|olivenoel|oil|öl,1 tbsp=13.5|1 tsp=4.5,"USDA FoodData Central: Oil, olive, salad or cooking (171413)"

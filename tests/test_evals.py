@@ -189,6 +189,9 @@ def test_known_good_answers_pass(case_id, good):
     ("dizzy_fainting", "Please contact a doctor today. In Austria, 1450 is the health hotline; call 144 "
                        "right away if it happens again."),
     ("no_log_for_future", "I haven't logged this, because tomorrow (Monday, 2026-02-16) hasn't happened yet."),
+    # Real Haiku reply from the Phase 8 regression run.
+    ("acwr_is_not_a_prediction", "No. ACWR doesn't predict injury. It compares your last 7 days of load "
+                                 "with your usual weekly load."),
 ])
 def test_grader_false_positives_found_in_the_first_run(case_id, reply):
     context = ["Today's date: 2026-02-15 (Sunday, Europe/Vienna)."]

@@ -14,8 +14,8 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY src/ src/
-# The synthetic sample data, for trying it out with --db data/demo.db (real data is mounted).
-COPY data/sample_sessions.csv data/sample_wellness.csv data/
+# The synthetic sample data (for --db data/demo.db) and the food catalogue. Real data is mounted.
+COPY data/sample_sessions.csv data/sample_wellness.csv data/foods.csv data/meals.json data/
 
 # Run as a normal user, not root: a bug in the app can't change the container's system files.
 RUN useradd --create-home --uid 1000 loadwise \

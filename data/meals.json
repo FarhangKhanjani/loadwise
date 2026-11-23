@@ -1,0 +1,63 @@
+{
+  "_about": "Saved meals. Each item is a food from foods.csv with either grams, or a portion name and a count. Optional items are off by default and can be switched on when logging; any amount can be changed when logging.",
+  "meals": [
+    {
+      "name": "oatmeal bowl",
+      "slot": "breakfast",
+      "aliases": ["oatmeal", "porridge", "haferbrei"],
+      "items": [
+        {"food": "oats", "grams": 120},
+        {"food": "milk", "portion": "100 ml", "count": 1},
+        {"food": "banana", "portion": "1 medium", "count": 1},
+        {"food": "blueberries", "grams": 100, "optional": true},
+        {"food": "mango", "grams": 100, "optional": true}
+      ]
+    },
+    {
+      "name": "pancakes",
+      "slot": "breakfast",
+      "aliases": ["pancake", "palatschinken"],
+      "items": [
+        {"food": "egg", "portion": "1 large", "count": 2},
+        {"food": "milk", "grams": 100},
+        {"food": "honey", "portion": "1 tbsp", "count": 1},
+        {"food": "banana", "portion": "1 medium", "count": 1},
+        {"food": "mixed berries", "grams": 100},
+        {"food": "olive oil", "grams": 5}
+      ]
+    },
+    {
+      "name": "nimrou",
+      "slot": "breakfast",
+      "aliases": ["nimroo", "fried eggs", "spiegelei"],
+      "items": [
+        {"food": "egg", "portion": "1 large", "count": 2},
+        {"food": "protein toast", "portion": "1 slice", "count": 4},
+        {"food": "tomato", "portion": "1/2 medium", "count": 1},
+        {"food": "khiarshour", "portion": "1 small", "count": 3},
+        {"food": "olive oil", "grams": 5}
+      ]
+    },
+    {
+      "name": "meat plate",
+      "slot": "lunch",
+      "aliases": ["beef plate", "fleischteller"],
+      "items": [
+        {"food": "beef", "grams": 200},
+        {"food": "mixed vegetables", "grams": 200},
+        {"food": "fries", "grams": 100}
+      ]
+    },
+    {
+      "name": "pasta",
+      "slot": "lunch",
+      "aliases": ["pasta plate", "spaghetti", "nudeln"],
+      "items": [
+        {"food": "pasta", "grams": 100},
+        {"food": "tomato sauce", "grams": 125},
+        {"food": "olive oil", "grams": 10},
+        {"food": "parmesan", "portion": "1 tbsp", "count": 2}
+      ]
+    }
+  ]
+}

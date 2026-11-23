@@ -342,3 +342,44 @@ The Docker files, the CI workflow, the README (including a draft of "How I built
 - Approved the plan, including CI and splitting the requirements
 - Chose to commit with the image build checked by CI, instead of waiting for Docker Desktop on my PC
 - _(add anything else here, and fill in the two ✏️ placeholders in the README)_
+
+---
+
+## Phase 8: Calorie tracker (2026-11-23)
+
+Not in the original brief. I asked for it, together with a phone app (Phase 9). The brief listed "web frontend" as out of scope; I changed that.
+
+### What was built
+- **Food catalogue with traceable values:**
+  - `data/food_sources.csv` lists which source each food uses.
+  - `scripts/usda_lookup.py` (`search`, `build`) fetches kcal and protein per 100 g from **USDA FoodData Central** (SR Legacy) by FDC ID and writes `data/foods.csv`, with the source of every row.
+  - 20 foods. One package label: BILLA Protein Toast, 285 kcal and 21 g protein per 100 g, 26 g per slice. One average of three USDA berries.
+  - Portion weights come from USDA as well: medium banana 118 g, large egg 50 g, 1 tbsp honey 21 g, small sour pickle 37 g.
+- `data/meals.json`: 5 saved meals from my list (oatmeal bowl, pancakes, nimrou, meat plate, pasta), with optional items. Dinner follows later.
+- `src/nutrition.py` (pure): kcal and protein from grams or portions, meal totals with optional items and changed amounts, a forgiving search (case, umlauts, typos, German aliases), day and month summaries.
+- `src/food_log.py`: tables `foods`, `meal_templates` and `food_log`. It loads the catalogue (safe to re-run), logs foods and meals, deletes an entry or a whole meal, and reads day and month history.
+- API: `/foods`, `/meals`, `/food-log`, `/food-log/meal` (+ preview), `DELETE /food-log/{id}`, `/nutrition/day`, `/nutrition/month`
+- Telegram: `/kcal` and `/kcal month`
+- Agent: a read-only `get_nutrition_summary` tool, and a prompt section with numbers only and no judgement or diet advice
+- Tests: `test_nutrition.py` (25), `test_food_log.py` (14), plus API, `/kcal` and tool tests. 313 tests in total.
+
+### Key decisions
+- **Every number has a source:** a USDA FDC ID or a package label, and portion weights from USDA too. Nothing is typed in from memory. The lookup script makes adding dinner foods one command.
+- **Raw weights where I weigh raw** (beef 200 g raw, dry pasta), so the USDA raw values match.
+- **Each entry stores its kcal and protein when logged**, so correcting a food later never rewrites history (tested).
+- **Food is saved directly, without a Confirm step.** Only I enter it (the agent can't log food), and the app shows the kcal before saving. Mistakes are deleted.
+- **The monthly average counts only logged days:** an empty day is probably a forgotten log, the same "missing data is not rest" idea as for training.
+- **No targets, no judgement, no diet advice:** this is calorie tracking within an informational tool.
+
+### Verification
+- 313 tests pass. The catalogue loaded into `data/loadwise.db` (20 foods, 5 meals), with the training data untouched.
+- Haiku eval re-run after the new tool and prompt section: **60/60**, no regression, cost $0.02. The one failure in the raw run was the grader again: "ACWR doesn't predict injury" wasn't accepted. It is fixed, with that reply as a regression test.
+
+### What the AI generated
+All code, tests, the lookup script, the food and meal files from my list, and this entry.
+
+### What I decided or changed myself
+- Asked for the calorie tracker and the phone app (scope change), and gave my meal list
+- Official values (USDA) instead of typed-in numbers; got the USDA API key
+- Gave the BILLA Protein Toast label values; beef weighed raw; meat plate with veggies and fries together; pancakes without flour, a little olive oil
+- _(add anything else here)_

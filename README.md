@@ -20,6 +20,7 @@ LoadWise makes logging a one-line Telegram message, does the maths deterministic
 - **Nothing is saved without your OK:** every entry, from you or from the AI, appears with **✅ Confirm / ❌ Reject** buttons first.
 - **Ask about your data:** "how was my week?", "am I undertraining?". The agent answers with numbers taken from tools, never from its own estimates.
 - **Morning check at 08:00 (Vienna):** a Telegram alert when a new flag appears, never the same alert twice.
+- **Track calories and protein** from a food list with official USDA values, your saved meals (oatmeal bowl, nimrou…), and a monthly history.
 - **Import your history** from a Strava export.
 - **HTTP API** for health checks, metrics and logging.
 
@@ -31,7 +32,7 @@ flowchart LR
     subgraph app["One process: python -m src.main"]
         bot["Telegram bot<br/>python-telegram-bot"]
         agent["Agent loop<br/>Claude Haiku 5.5, tool use"]
-        tools["Tools<br/>4 read, 3 propose"]
+        tools["Tools<br/>5 read, 3 propose"]
         rules["Metrics and rules<br/>pure Python, unit tested"]
         confirm["confirm_action()<br/>the only save path"]
         sched["Daily check 08:00<br/>APScheduler"]
@@ -115,6 +116,35 @@ All based on **session RPE** (Foster): after each session, rate the whole sessio
 - **Missing logs look like rest.** One session after months without logs gives ACWR 4.0, which looks like a spike but is really missing data. Load alerts are therefore paused unless all 4 weeks of the ACWR window contain logged sessions. `/status` and the agent warn when weeks are empty or nothing has been logged for 3 or more days.
 - ACWR needs 28 days of history. Before that it is shown as "n/a", never guessed.
 
+## Calorie tracker
+
+A simple food log, kept separate from the training metrics:
+
+- **Foods:** 20 foods with kcal and protein per 100 g, each traceable to a source. That's a USDA FoodData Central ID (for example *Bananas, raw (173944)*) or, for the protein toast, the BILLA package label. Portions use USDA weights: 1 medium banana = 118 g, 1 large egg = 50 g, 1 tbsp honey = 21 g.
+- **Search** ignores case, umlauts and small typos, and knows German aliases: "haferflocken" finds oats, "eier" finds eggs, "bananna" finds banana.
+- **Saved meals:** a template of several foods (`data/meals.json`). Optional items, such as the blueberries in the oatmeal bowl, can be switched on, and any amount can be changed when logging.
+
+| Meal | Default |
+|---|---|
+| oatmeal bowl | oats 120 g, milk 100 ml, 1 banana (+ blueberries, mango optional): **623 kcal** |
+| pancakes | 2 eggs, milk 100 g, 1 tbsp honey, 1 banana, berries 100 g, olive oil 5 g |
+| nimrou | 2 eggs, 4 slices protein toast, ½ tomato, 3 khiarshour, olive oil 5 g: **507 kcal** |
+| meat plate | beef 200 g raw, mixed vegetables 200 g, fries 100 g |
+| pasta | pasta 100 g dry, tomato sauce 125 g, olive oil 10 g, parmesan 2 tbsp |
+
+- **History:** totals per day, per meal slot and per month. The monthly average counts only days with entries, because an empty day is far more likely a forgotten log than a day without food.
+- **No judgement:** numbers only, with no targets, diet advice or "too much / too little". The agent can read your food log (`get_nutrition_summary`) but can't log food, and its prompt forbids diet advice.
+- **Stored values:** each entry stores its kcal and protein when you log it, so correcting a food later never rewrites your history.
+
+**Adding foods** (for example your dinner list): find the USDA ID, add a row to `data/food_sources.csv`, and rebuild. You need a free `USDA_API_KEY` in `.env`.
+```bash
+python scripts/usda_lookup.py search "chicken breast roasted"
+```
+```bash
+python scripts/usda_lookup.py build
+```
+The app loads the catalogue at startup.
+
 ## Evaluation
 
 20 scenarios in 4 categories, each run 3 times against the real agent, and graded by automatic checks (`evals/`). Details, failures and limitations are in [evals/RESULTS.md](evals/RESULTS.md).
@@ -191,6 +221,7 @@ python -m src.import_strava data/private/activities.csv --db data/loadwise.db
 | `/log [today\|yesterday\|YYYY-MM-DD] <sport> <minutes> <rpe> [notes]` | `/log yesterday padel 75 6` |
 | `/wellness [date] <sleep h> <soreness> <fatigue> <stress> [resting HR]` | `/wellness 7,5 3 4 3 52` |
 | `/status` | load metrics and active flags, free (no AI) |
+| `/kcal`, `/kcal month` | calories and protein today, or this month per day |
 | `/reset`, `/help` | new conversation, help |
 | anything else | goes to the AI agent |
 
@@ -204,6 +235,12 @@ Sports: `gym`, `table_tennis` (`tt`), `table_tennis_match` (`match`), `padel`, `
 | `GET /metrics?as_of=YYYY-MM-DD` | the numbers `/status` shows, as JSON |
 | `GET /flags?as_of=` | active flags and data coverage |
 | `POST /sessions` | proposes a session and sends you the Confirm buttons on Telegram |
+| `GET /foods?q=` | search foods (all foods without `q`) |
+| `GET /meals` | saved meals with their default kcal and protein |
+| `POST /food-log` | log a food: `{"slot", "food", "grams"}` or `{"slot", "food", "portion", "count"}` |
+| `POST /food-log/meal/preview`, `POST /food-log/meal` | preview or log a saved meal (`include_optional`, changed `grams`) |
+| `DELETE /food-log/{id}?whole_meal=` | delete an entry, or the whole meal it belongs to |
+| `GET /nutrition/day?date=`, `GET /nutrition/month?month=YYYY-MM` | daily and monthly history |
 
 ```bash
 curl -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/metrics
@@ -220,6 +257,7 @@ curl -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/metrics
 | `DB_PATH` | `data/loadwise.db` | SQLite file |
 | `TIMEZONE` | `Europe/Vienna` | for "today" and the 08:00 check |
 | `API_KEY` | – | at least 16 characters; without it the data endpoints stay closed |
+| `USDA_API_KEY` | – | only to add or refresh foods with `scripts/usda_lookup.py` |
 | `API_HOST`, `API_PORT` | `127.0.0.1`, `8000` | |
 
 ## Tests
@@ -227,7 +265,7 @@ curl -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/metrics
 ```bash
 pytest
 ```
-265 tests, run in CI on every push with no secrets needed, because the agent tests use a fake Claude client. The paid evals are run by hand:
+313 tests, run in CI on every push with no secrets needed, because the agent tests use a fake Claude client. The paid evals are run by hand:
 ```bash
 python -m evals.run_evals --model claude-haiku-5-5 --reps 3
 ```
@@ -242,7 +280,10 @@ src/
   bot.py                   Telegram bot
   scheduler.py             08:00 check, alert cooldown, sending
   api.py, main.py          FastAPI app; one process for API + bot + scheduler
+  nutrition.py, food_log.py  calorie maths and search (pure); food log storage
   import_csv.py, import_strava.py
+scripts/usda_lookup.py     builds data/foods.csv from USDA FoodData Central
+data/foods.csv, meals.json food catalogue (with sources) and saved meals
 evals/                     scenarios, graders, runner, RESULTS.md
 tests/                     unit tests for everything above
 ```

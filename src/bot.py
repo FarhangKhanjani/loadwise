@@ -101,6 +101,7 @@ Short names: tt = table_tennis, match = table_tennis_match
 {WELLNESS_USAGE}
 
 /status: load metrics and active flags (free, no AI)
+/kcal: today's calories and protein; /kcal month for this month
 /reset: start a new conversation with the assistant
 /help: this message
 
@@ -256,6 +257,39 @@ def format_status(summary: dict, flags: dict) -> str:
 
 def status_text(ctx: ToolContext) -> str:
     return format_status(get_load_summary(ctx), get_active_flags(ctx))
+
+
+# ---------- /kcal ----------
+
+def format_kcal_day(summary: dict) -> str:
+    """Plain text for /kcal, from food_log.day(). Numbers only, no judgement."""
+    lines = [f"Calories for {summary['date']}: {summary['kcal']:,} kcal · {summary['protein']} g protein"]
+    for slot, values in summary["by_slot"].items():
+        if values["kcal"]:
+            lines.append(f"  {slot}: {values['kcal']:,} kcal · {values['protein']} g protein")
+    if not summary["items"]:
+        lines.append("Nothing logged yet today.")
+    return "\n".join(lines)
+
+
+def format_kcal_month(summary: dict) -> str:
+    lines = [f"Calories for {summary['month']}: {summary['total_kcal']:,} kcal on "
+             f"{summary['days_logged']} of {summary['days_in_range']} days logged"]
+    if summary["days_logged"]:
+        lines.append(f"Average per logged day: {summary['avg_kcal_per_logged_day']:,} kcal · "
+                     f"{summary['avg_protein_per_logged_day']} g protein")
+        lines += [f"  {d['date'][5:]}: {d['kcal']:,} kcal" for d in summary["days"] if d["logged"]]
+    else:
+        lines.append("Nothing logged this month yet.")
+    return "\n".join(lines)
+
+
+def kcal_text(db: Session, args: list[str], today: date) -> str:
+    from src import food_log
+
+    if args[:1] == ["month"]:
+        return format_kcal_month(food_log.month(db, today.year, today.month, today))
+    return format_kcal_day(food_log.day(db, today))
 
 
 # ---------- Confirm / Reject buttons ----------
@@ -415,6 +449,13 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(HELP_TEXT)
 
 
+async def cmd_kcal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    state = _state(context)
+    with state.session_factory() as db:
+        text = kcal_text(db, context.args or [], state.today())
+    await update.effective_message.reply_text(text)
+
+
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     state = _state(context)
     with state.session_factory() as db:
@@ -525,6 +566,7 @@ async def set_command_menu(application: Application) -> None:
         BotCommand("log", "Propose a training session"),
         BotCommand("wellness", "Propose today's wellness entry"),
         BotCommand("status", "Load metrics and flags"),
+        BotCommand("kcal", "Calories today (or: /kcal month)"),
         BotCommand("reset", "New conversation with the assistant"),
         BotCommand("help", "How to use LoadWise"),
     ])
@@ -537,7 +579,8 @@ def build_application(token: str, state: BotState, allowed_chat_id: int) -> Appl
     # New messages only: editing an old "/log ..." message must not create a second proposal.
     new = filters.UpdateType.MESSAGE
     for name, callback in (("start", cmd_help), ("help", cmd_help), ("status", cmd_status),
-                           ("reset", cmd_reset), ("log", cmd_log), ("wellness", cmd_wellness)):
+                           ("reset", cmd_reset), ("log", cmd_log), ("wellness", cmd_wellness),
+                           ("kcal", cmd_kcal)):
         app.add_handler(CommandHandler(name, callback, filters=new))
     app.add_handler(MessageHandler(filters.COMMAND & new, cmd_unknown))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & new, on_text))
@@ -575,10 +618,14 @@ def main() -> None:
             client = anthropic.Anthropic()
         except anthropic.AnthropicError as e:
             sys.exit(f"Could not create the Claude client: {e}\nSet ANTHROPIC_API_KEY in .env.")
+        from src.food_log import load_catalog
+
         engine = make_engine(args.db)
         init_db(engine)
-        state = BotState(make_session_factory(engine), Agent(client, args.model),
-                         settings.timezone, args.as_of)
+        factory = make_session_factory(engine)
+        with factory() as db:
+            load_catalog(db)
+        state = BotState(factory, Agent(client, args.model), settings.timezone, args.as_of)
         app = build_application(token, state, int(settings.telegram_chat_id))
         print(f"LoadWise bot running ({args.model}, {engine.url.database}"
               + (f", today = {args.as_of}" if args.as_of else "") + "). Ctrl+C to stop.")

@@ -349,3 +349,24 @@ def test_conversation_resets_after_an_hour_idle(state):
 
     assert state.expire_if_idle(now=600.0 + IDLE_RESET_SECONDS + 1)
     assert state.agent.messages == []
+
+
+# ---------- /kcal ----------
+
+def test_kcal_today_and_month(catalog_db):
+    from src import food_log
+    from src.bot import kcal_text
+
+    day = date(2026, 11, 20)
+    assert "Nothing logged yet today." in kcal_text(catalog_db, [], day)
+    food_log.log_meal(catalog_db, day, None, "oatmeal bowl")
+    food_log.log_food(catalog_db, date(2026, 11, 3), "dinner", "pasta", grams=100)
+
+    today = kcal_text(catalog_db, [], day)
+    assert today.startswith("Calories for 2026-11-20: 623 kcal · 20 g protein")
+    assert "breakfast: 623 kcal" in today and "lunch" not in today
+
+    month = kcal_text(catalog_db, ["month"], day)
+    assert "Calories for 2026-11: 994 kcal on 2 of 20 days logged" in month
+    assert "Average per logged day: 497 kcal" in month
+    assert "11-03: 371 kcal" in month

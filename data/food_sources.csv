@@ -1,0 +1,21 @@
+name,source,kcal,protein,aliases,portions
+oats,usda:173904,,,haferflocken|hafer|oatmeal|porridge oats,1 cup=81
+milk,usda:172217,,,milch|whole milk|vollmilch,100 ml=103|1 cup=244
+banana,usda:173944,,,banane|bananen,1 medium=118|1 small=101|1 large=136
+blueberries,usda:171711,,,heidelbeeren|blaubeeren,1 cup=148
+mango,usda:169910,,,mangos,1 cup pieces=165
+strawberries,usda:167762,,,erdbeeren,
+raspberries,usda:167755,,,himbeeren,
+mixed berries,usda_avg:167762+167755+171711,,,berries|beeren|beerenmix,
+egg,usda:171287,,,ei|eier|eggs,1 large=50|1 medium=44
+honey,usda:169640,,,honig,1 tbsp=21
+protein toast,label:BILLA Protein Toast (520 g pack),285,21,eiweisstoast|eiweißtoast|protein bread|billa protein toast|toast,1 slice=26
+tomato,usda:170457,,,tomate|paradeiser|tomatoes,1 medium=123|1/2 medium=61.5
+khiarshour,usda:169379,,,pickles|sour pickles|gurke|essiggurke|salzgurke,1 small=37
+beef,usda:170810,,,rind|rindfleisch|meat|fleisch,
+mixed vegetables,usda:170471,,,veggies|vegetables|gemüse|gemuese,
+fries,usda:170118,,,pommes|pommes frites|french fries,
+pasta,usda:169736,,,nudeln|spaghetti|penne|pasta dry,
+tomato sauce,usda:171192,,,tomatensauce|sugo|marinara|pasta sauce,
+parmesan,usda:171247,,,parmesan cheese|parmesankäse,1 tbsp=5
+olive oil,usda:171413,,,olivenöl|olivenoel|oil|öl,1 tbsp=13.5|1 tsp=4.5

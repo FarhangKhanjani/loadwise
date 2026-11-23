@@ -79,3 +79,60 @@ def test_post_session_only_proposes(client, bot_state):
 def test_post_session_validation(client, bot_state, payload):
     assert client.post("/sessions", headers=AUTH, json=payload).status_code == 422
     assert count(bot_state, PendingAction) == 0
+
+
+# ---------- calorie tracker ----------
+
+def test_food_search_uses_aliases(client):
+    foods = client.get("/foods?q=haferflocken", headers=AUTH).json()
+    assert foods[0]["name"] == "oats" and foods[0]["kcal_per_100g"] == 379.0
+    assert "USDA" in foods[0]["source"]
+    assert len(client.get("/foods", headers=AUTH).json()) >= 20  # no query: the whole list
+
+
+def test_meals_list_default_totals(client):
+    meals = {m["name"]: m for m in client.get("/meals", headers=AUTH).json()}
+    assert meals["oatmeal bowl"]["default"]["kcal"] == 622.6
+    assert meals["oatmeal bowl"]["optional"] == ["blueberries", "mango"]
+
+
+def test_log_food_and_see_it_today(client):
+    response = client.post("/food-log", headers=AUTH, json={"slot": "snack", "food": "banana",
+                                                           "portion": "1 medium", "count": 1})
+    assert response.status_code == 201 and response.json()["kcal"] == 105.0
+    day = client.get("/nutrition/day", headers=AUTH).json()  # today = 2026-02-15 (bot_state)
+    assert day["date"] == "2026-02-15" and day["kcal"] == 105
+
+
+def test_preview_then_log_meal_then_delete(client):
+    body = {"meal": "oatmeal bowl", "include_optional": ["mango"]}
+    preview = client.post("/food-log/meal/preview", headers=AUTH, json=body).json()
+    assert preview["kcal"] == 682.6  # + 100 g mango (60)
+    logged = client.post("/food-log/meal", headers=AUTH, json=body)
+    assert logged.status_code == 201 and logged.json()["kcal"] == 682.6
+    first = logged.json()["entries"][0]["id"]
+    deleted = client.delete(f"/food-log/{first}?whole_meal=true", headers=AUTH).json()
+    assert deleted["deleted"] == 4
+    assert client.delete(f"/food-log/{first}", headers=AUTH).status_code == 404
+
+
+def test_month_history(client):
+    client.post("/food-log", headers=AUTH, json={"date": "2026-02-10", "slot": "lunch", "food": "pasta",
+                                                 "grams": 100})
+    month = client.get("/nutrition/month?month=2026-02", headers=AUTH).json()
+    assert month["days_logged"] == 1 and month["total_kcal"] == 371 and month["days_in_range"] == 15
+    assert client.get("/nutrition/month?month=feb", headers=AUTH).status_code == 422
+
+
+@pytest.mark.parametrize("body", [
+    {"slot": "brunch", "food": "oats", "grams": 100},
+    {"slot": "lunch", "food": "unicorn steak", "grams": 100},
+    {"slot": "lunch", "food": "oats", "grams": 0},
+])
+def test_log_food_validation(client, body):
+    assert client.post("/food-log", headers=AUTH, json=body).status_code == 422
+
+
+def test_food_endpoints_need_the_key(client):
+    assert client.get("/foods").status_code == 401
+    assert client.post("/food-log", json={"slot": "lunch", "food": "oats", "grams": 1}).status_code == 401

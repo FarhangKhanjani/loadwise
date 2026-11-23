@@ -64,6 +64,51 @@ class Alert(Base):
     sent: Mapped[bool] = mapped_column(default=False)
 
 
+class Food(Base):
+    """A food you can search and log. Loaded from data/foods.csv (USDA values or package labels)."""
+    __tablename__ = "foods"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    kcal_per_100g: Mapped[float]
+    protein_per_100g: Mapped[float]
+    aliases: Mapped[list] = mapped_column(JSON, default=list)    # ["ei", "eier"]
+    portions: Mapped[dict] = mapped_column(JSON, default=dict)   # {"1 large": 50}
+    source: Mapped[str]                                          # where the numbers come from
+
+
+class MealTemplate(Base):
+    """A saved meal: several foods with default amounts. Loaded from data/meals.json."""
+    __tablename__ = "meal_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    slot: Mapped[str] = mapped_column(String(10))               # default meal slot
+    aliases: Mapped[list] = mapped_column(JSON, default=list)
+    items: Mapped[list] = mapped_column(JSON)                    # [{"food", "grams" | "portion"+"count", "optional"}]
+
+
+class FoodLogEntry(Base):
+    """One eaten item. kcal and protein are stored when logged (a snapshot), so changing a
+    food's values later never rewrites history."""
+    __tablename__ = "food_log"
+    __table_args__ = (
+        CheckConstraint("grams > 0", name="ck_food_grams_positive"),
+        CheckConstraint("slot IN ('breakfast', 'lunch', 'dinner', 'snack')", name="ck_food_slot"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    date: Mapped[dt.date] = mapped_column(index=True)
+    slot: Mapped[str] = mapped_column(String(10))
+    food_name: Mapped[str] = mapped_column(String(100))
+    grams: Mapped[float]
+    kcal: Mapped[float]
+    protein: Mapped[float]
+    meal_name: Mapped[str | None] = mapped_column(String(100))  # set when logged as part of a saved meal
+    group_id: Mapped[str | None] = mapped_column(String(32))    # items logged together share it
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+
+
 class PendingAction(Base):
     __tablename__ = "pending_actions"
 

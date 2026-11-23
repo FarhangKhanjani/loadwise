@@ -192,6 +192,35 @@ def get_active_flags(ctx: ToolContext, as_of: str | None = None) -> dict:
     }
 
 
+def get_nutrition_summary(ctx: ToolContext, start_date: str, end_date: str) -> dict:
+    """Calories and protein per day from the food log. Read-only: the agent never logs food."""
+    from src.food_log import entries_between
+
+    start, end = _parse_date(start_date, "start_date"), _parse_date(end_date, "end_date")
+    if start > end:
+        raise ToolError("start_date must not be after end_date")
+    if (end - start).days > 92:
+        raise ToolError("date range is limited to 93 days")
+    per_day: dict[date, list] = {}
+    for e in entries_between(ctx.db, start, end):
+        per_day.setdefault(e.date, []).append(e)
+    days = [{"date": d.isoformat(), "kcal": round(sum(e.kcal for e in es)),
+             "protein": round(sum(e.protein for e in es))} for d, es in sorted(per_day.items())]
+    n_days = (end - start).days + 1
+    total_kcal = sum(d["kcal"] for d in days)
+    return {
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "days_logged": len(days),
+        "days_not_logged": n_days - len(days),
+        "total_kcal": total_kcal,
+        "total_protein": sum(d["protein"] for d in days),
+        "avg_kcal_per_logged_day": round(total_kcal / len(days)) if days else None,
+        "days": days,
+        "note": "Days without entries are probably not logged, not days without food.",
+    }
+
+
 # ---------- proposal tools (never write data directly) ----------
 
 def _propose(ctx: ToolContext, action_type: str, payload: dict, summary: str) -> dict:
@@ -340,6 +369,13 @@ TOOLS = [
         "input_schema": _schema({"as_of": AS_OF}, []),
     },
     {
+        "name": "get_nutrition_summary",
+        "description": "Calories and protein the athlete logged per day between two dates (inclusive), with "
+                       "totals, the average per logged day and how many days have no entries. Read-only.",
+        "strict": True,
+        "input_schema": _schema({"start_date": DATE, "end_date": DATE}, ["start_date", "end_date"]),
+    },
+    {
         "name": "log_session",
         "description": "Propose logging a training session. Does NOT save it: creates a pending action the user "
                        "confirms or rejects. Only call it when the user reported a session.",
@@ -386,6 +422,7 @@ HANDLERS = {
     "get_sessions": get_sessions,
     "get_wellness_trend": get_wellness_trend,
     "get_active_flags": get_active_flags,
+    "get_nutrition_summary": get_nutrition_summary,
     "log_session": log_session,
     "log_wellness": log_wellness,
     "propose_plan_change": propose_plan_change,

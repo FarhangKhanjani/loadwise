@@ -222,3 +222,18 @@ def test_execute_tool_errors(ctx, name, tool_input, message):
     output, is_error = execute_tool(ctx, name, tool_input)
     assert is_error
     assert message in json.loads(output)["error"]
+
+
+def test_nutrition_summary_reads_the_food_log(catalog_db):
+    from src import food_log
+    from src.tools import get_nutrition_summary
+
+    food_log.log_meal(catalog_db, date(2026, 11, 20), None, "oatmeal bowl")
+    food_log.log_food(catalog_db, date(2026, 11, 18), "lunch", "pasta", grams=100)
+    result = get_nutrition_summary(ToolContext(catalog_db, date(2026, 11, 20)), "2026-11-14", "2026-11-20")
+    assert result["days_logged"] == 2 and result["days_not_logged"] == 5
+    assert result["total_kcal"] == 623 + 371
+    assert result["avg_kcal_per_logged_day"] == 497
+    assert [d["date"] for d in result["days"]] == ["2026-11-18", "2026-11-20"]
+    with pytest.raises(ToolError):
+        get_nutrition_summary(ToolContext(catalog_db, date(2026, 11, 20)), "2026-01-01", "2026-11-20")

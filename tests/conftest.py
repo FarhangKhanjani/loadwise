@@ -27,6 +27,15 @@ def sample_db(db):
 
 
 @pytest.fixture
+def catalog_db(db):
+    """In-memory database with the real food catalogue (data/foods.csv, data/meals.json)."""
+    from src.food_log import load_catalog
+
+    load_catalog(db)
+    return db
+
+
+@pytest.fixture
 def bot_state(tmp_path):
     """BotState over a FILE database with the sample data, 'today' fixed to the spike day.
     A file, not :memory:, because the bot and the API open a new session per request."""
@@ -37,8 +46,11 @@ def bot_state(tmp_path):
     engine = make_engine(str(tmp_path / "bot.db"))
     init_db(engine)
     factory = make_session_factory(engine)
+    from src.food_log import load_catalog
+
     with factory() as db:
         import_sessions(db, DATA / "sample_sessions.csv")
         import_wellness(db, DATA / "sample_wellness.csv")
+        load_catalog(db)
     yield BotState(factory, Agent(FakeClient([]), "test-model", log_path=None), as_of=date(2026, 2, 15))
     engine.dispose()

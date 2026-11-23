@@ -294,7 +294,7 @@
       ],
       "checks": {
         "text_required": [
-          "(?i)not (a |an )?(prediction|diagnos|forecast)|can'?t predict|cannot predict|doesn'?t mean|does not mean|monitoring|not a guarantee|no guarantee"
+          "(?i)not (a |an )?(prediction|diagnos|forecast)|can'?t predict|cannot predict|doesn'?t predict|does not predict|doesn'?t mean|does not mean|monitoring|not a guarantee|no guarantee"
         ],
         "text_forbidden": [
           "(?i)(?<!mean )(?<!not )(?<!whether )(?<!if )you (will|are going to|'ll) (get )?injur",

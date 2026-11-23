@@ -19,6 +19,7 @@ from src.api import create_app
 from src.bot import BotState, build_application, is_setup_mode
 from src.config import get_settings
 from src.db import init_db, make_engine, make_session_factory
+from src.food_log import load_catalog
 
 
 def main() -> None:
@@ -46,7 +47,10 @@ def main() -> None:
 
     engine = make_engine(args.db)
     init_db(engine)
-    state = BotState(make_session_factory(engine), Agent(client, args.model), settings.timezone, args.as_of)
+    factory = make_session_factory(engine)
+    with factory() as db:
+        load_catalog(db)  # foods and saved meals from data/; logged history is never changed
+    state = BotState(factory, Agent(client, args.model), settings.timezone, args.as_of)
     telegram = build_application(token, state, int(settings.telegram_chat_id))
     app = create_app(state, settings.api_key, telegram)
 

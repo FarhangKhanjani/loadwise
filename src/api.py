@@ -20,15 +20,35 @@ from datetime import date
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from telegram import Update
 from telegram.ext import Application
 
+from src import food_log
 from src.bot import BotState, proposal_buttons, proposal_text, set_command_menu
+from src.models import Food, MealTemplate
+from src.nutrition import NutritionError, search
 from src.tools import ToolContext, ToolError, get_active_flags, get_load_summary, log_session
 
 MIN_API_KEY_LENGTH = 16  # also rejects the short .env.example placeholder
+
+
+class FoodIn(BaseModel):
+    date: dt.date | None = None  # default: today
+    slot: str
+    food: str
+    grams: float | None = None   # either grams...
+    portion: str | None = None   # ...or a portion name and a count
+    count: float = 1
+
+
+class MealIn(BaseModel):
+    date: dt.date | None = None
+    slot: str | None = None      # default: the meal's own slot
+    meal: str
+    include_optional: list[str] = []
+    grams: dict[str, float] = {}  # change a food's amount; 0 leaves it out
 
 
 class SessionIn(BaseModel):
@@ -93,6 +113,77 @@ def create_app(state: BotState, api_key: str | None, telegram: Application | Non
     @app.get("/flags", dependencies=[Depends(require_api_key)])
     def flags(as_of: date | None = None, db: Session = Depends(get_db)) -> dict:
         return get_active_flags(context(db, as_of))
+
+    # ---------- calorie tracker ----------
+
+    def nutrition_error(e: NutritionError) -> HTTPException:
+        return HTTPException(422, str(e))
+
+    @app.get("/foods", dependencies=[Depends(require_api_key)])
+    def foods(q: str = "", db: Session = Depends(get_db)) -> list[dict]:
+        all_foods = list(db.scalars(select(Food).order_by(Food.name)))
+        found = search(q, all_foods, limit=20) if q.strip() else all_foods
+        return [{"name": f.name, "kcal_per_100g": f.kcal_per_100g, "protein_per_100g": f.protein_per_100g,
+                 "portions": f.portions, "aliases": f.aliases, "source": f.source} for f in found]
+
+    @app.get("/meals", dependencies=[Depends(require_api_key)])
+    def meals(db: Session = Depends(get_db)) -> list[dict]:
+        out = []
+        for m in db.scalars(select(MealTemplate).order_by(MealTemplate.slot, MealTemplate.name)):
+            _, lines = food_log.preview_meal(db, m.name)
+            out.append({"name": m.name, "slot": m.slot, "items": m.items,
+                        "optional": [i["food"] for i in m.items if i.get("optional")],
+                        "default": food_log.lines_dict(lines)})
+        return out
+
+    @app.post("/food-log", status_code=201, dependencies=[Depends(require_api_key)])
+    def log_food(body: FoodIn, db: Session = Depends(get_db)) -> dict:
+        try:
+            entry = food_log.log_food(db, body.date or state.today(), body.slot, body.food,
+                                      body.grams, body.portion, body.count)
+        except NutritionError as e:
+            raise nutrition_error(e)
+        return food_log.entry_dict(entry)
+
+    @app.post("/food-log/meal/preview", dependencies=[Depends(require_api_key)])
+    def preview_meal(body: MealIn, db: Session = Depends(get_db)) -> dict:
+        try:
+            meal, lines = food_log.preview_meal(db, body.meal, body.include_optional, body.grams)
+        except NutritionError as e:
+            raise nutrition_error(e)
+        return {"meal": meal.name, **food_log.lines_dict(lines)}
+
+    @app.post("/food-log/meal", status_code=201, dependencies=[Depends(require_api_key)])
+    def log_meal(body: MealIn, db: Session = Depends(get_db)) -> dict:
+        try:
+            entries = food_log.log_meal(db, body.date or state.today(), body.slot, body.meal,
+                                        body.include_optional, body.grams)
+        except NutritionError as e:
+            raise nutrition_error(e)
+        return {"entries": [food_log.entry_dict(e) for e in entries],
+                "kcal": round(sum(e.kcal for e in entries), 1),
+                "protein": round(sum(e.protein for e in entries), 1)}
+
+    @app.delete("/food-log/{entry_id}", dependencies=[Depends(require_api_key)])
+    def delete_food(entry_id: int, whole_meal: bool = False, db: Session = Depends(get_db)) -> dict:
+        try:
+            return {"deleted": food_log.delete_entries(db, entry_id, whole_meal)}
+        except NutritionError as e:
+            raise HTTPException(404, str(e))
+
+    @app.get("/nutrition/day", dependencies=[Depends(require_api_key)])
+    def nutrition_day(date: date | None = None, db: Session = Depends(get_db)) -> dict:
+        return food_log.day(db, date or state.today())
+
+    @app.get("/nutrition/month", dependencies=[Depends(require_api_key)])
+    def nutrition_month(month: str | None = None, db: Session = Depends(get_db)) -> dict:
+        today = state.today()
+        try:
+            year, month_ = (int(p) for p in month.split("-")) if month else (today.year, today.month)
+            dt.date(year, month_, 1)
+        except ValueError:
+            raise HTTPException(422, "month must be YYYY-MM")
+        return food_log.month(db, year, month_, today)
 
     @app.post("/sessions", status_code=202, dependencies=[Depends(require_api_key)])
     async def propose_session(body: SessionIn, db: Session = Depends(get_db)) -> dict:
