@@ -46,6 +46,18 @@ class Line:
     protein: float
 
 
+def suggested_slot(hour: int) -> str:
+    """The slot the app preselects for the local time: before 11 breakfast, before 16 lunch,
+    before 18 snack, then dinner. Only a default; the user can always pick another."""
+    if hour < 11:
+        return "breakfast"
+    if hour < 16:
+        return "lunch"
+    if hour < 18:
+        return "snack"
+    return "dinner"
+
+
 # ---------- amounts ----------
 
 def item_values(food: FoodLike, grams: float) -> Line:

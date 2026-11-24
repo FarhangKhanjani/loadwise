@@ -14,6 +14,7 @@ from src.nutrition import (
     month_summary,
     normalize,
     search,
+    suggested_slot,
     total,
 )
 
@@ -146,3 +147,11 @@ def test_month_summary_averages_only_logged_days():
 def test_month_summary_for_a_past_month_and_an_empty_month():
     past = month_summary([], 2026, 2, today=date(2026, 11, 5))
     assert past["days_in_range"] == 28 and past["avg_kcal_per_logged_day"] is None
+
+
+@pytest.mark.parametrize("hour, slot", [
+    (0, "breakfast"), (10, "breakfast"), (11, "lunch"), (15, "lunch"),
+    (16, "snack"), (17, "snack"), (18, "dinner"), (23, "dinner"),
+])
+def test_suggested_slot_follows_the_time_of_day(hour, slot):
+    assert suggested_slot(hour) == slot

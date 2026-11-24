@@ -136,3 +136,122 @@ def test_log_food_validation(client, body):
 def test_food_endpoints_need_the_key(client):
     assert client.get("/foods").status_code == 401
     assert client.post("/food-log", json={"slot": "lunch", "food": "oats", "grams": 1}).status_code == 401
+
+
+# ---------- phone app (Phase 9) ----------
+
+from src.models import Wellness  # noqa: E402
+
+
+def test_new_endpoints_need_the_key(client):
+    assert client.get("/meta").status_code == 401
+    assert client.get("/sessions/recent").status_code == 401
+    assert client.post("/food-log/preview", json={"food": "oats", "grams": 50}).status_code == 401
+    assert client.post("/wellness", json={"sleep_hours": 8, "soreness": 2, "fatigue": 2,
+                                          "stress": 2}).status_code == 401
+    assert client.post("/actions/1/confirm").status_code == 401
+    assert client.post("/actions/1/reject").status_code == 401
+
+
+def test_meta(client):
+    meta = client.get("/meta", headers=AUTH).json()
+    assert meta["today"] == "2026-02-15"
+    assert "padel" in meta["sports"] and meta["slots"] == ["breakfast", "lunch", "dinner", "snack"]
+    assert meta["suggested_slot"] in meta["slots"]
+
+
+def test_recent_sessions_newest_first(client):
+    body = client.get("/sessions/recent?days=7", headers=AUTH).json()
+    dates = [s["date"] for s in body["sessions"]]
+    assert dates == sorted(dates, reverse=True) and dates[0] <= "2026-02-15"
+    assert body["start_date"] == "2026-02-09" and all("load" in s for s in body["sessions"])
+    assert client.get("/sessions/recent?days=0", headers=AUTH).status_code == 422
+
+
+def test_food_preview(client, bot_state):
+    line = client.post("/food-log/preview", headers=AUTH,
+                       json={"food": "banana", "portion": "1 medium", "count": 1}).json()
+    assert line == {"food": "banana", "grams": 118.0, "kcal": 105.0, "protein": 1.3}
+    assert client.post("/food-log/preview", headers=AUTH,
+                       json={"food": "banana", "grams": 0}).status_code == 422
+
+
+def test_session_confirmed_in_the_app(client, bot_state):
+    before = count(bot_state, TrainingSession)
+    proposal = client.post("/sessions?notify_telegram=false", headers=AUTH,
+                           json={"sport_type": "padel", "duration_min": 75, "rpe": 6}).json()
+    assert proposal["telegram_sent"] is False and proposal["session_load"] == 450
+    action_id = proposal["pending_action_id"]
+    confirmed = client.post(f"/actions/{action_id}/confirm", headers=AUTH)
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "confirmed"
+    assert count(bot_state, TrainingSession) == before + 1
+    # a second tap (or the Telegram button after the app) changes nothing
+    assert client.post(f"/actions/{action_id}/confirm", headers=AUTH).status_code == 409
+    assert client.post(f"/actions/{action_id}/reject", headers=AUTH).status_code == 409
+    assert count(bot_state, TrainingSession) == before + 1
+
+
+def test_rejected_proposal_saves_nothing(client, bot_state):
+    before = count(bot_state, TrainingSession)
+    action_id = client.post("/sessions?notify_telegram=false", headers=AUTH,
+                            json={"sport_type": "gym", "duration_min": 60, "rpe": 7}).json()["pending_action_id"]
+    assert client.post(f"/actions/{action_id}/reject", headers=AUTH).json()["status"] == "rejected"
+    assert count(bot_state, TrainingSession) == before
+    assert client.post("/actions/9999/confirm", headers=AUTH).status_code == 404
+
+
+def test_wellness_proposal_and_confirm(client, bot_state):
+    before = count(bot_state, Wellness)
+    body = {"date": "2026-01-18", "sleep_hours": 7.5, "soreness": 3, "fatigue": 4, "stress": 2}
+    proposal = client.post("/wellness?notify_telegram=false", headers=AUTH, json=body)
+    assert proposal.status_code == 202
+    assert proposal.json()["summary"].startswith("Log wellness for 2026-01-18: sleep 7.5 h")
+    assert count(bot_state, Wellness) == before
+    client.post(f"/actions/{proposal.json()['pending_action_id']}/confirm", headers=AUTH)
+    assert count(bot_state, Wellness) == before + 1
+    # that day is logged now, and changing it is not supported
+    assert client.post("/wellness", headers=AUTH, json=body).status_code == 422
+
+
+def test_two_wellness_proposals_for_one_day_conflict(client, bot_state):
+    body = {"date": "2026-01-25", "sleep_hours": 8, "soreness": 2, "fatigue": 2, "stress": 2}
+    first, second = (client.post("/wellness", headers=AUTH, json=body).json()["pending_action_id"]
+                     for _ in range(2))
+    assert client.post(f"/actions/{first}/confirm", headers=AUTH).status_code == 200
+    assert client.post(f"/actions/{second}/confirm", headers=AUTH).status_code == 409
+
+
+@pytest.mark.parametrize("body", [
+    {"sleep_hours": 30, "soreness": 2, "fatigue": 2, "stress": 2},
+    {"sleep_hours": 8, "soreness": 0, "fatigue": 2, "stress": 2},
+    {"date": "2026-02-16", "sleep_hours": 8, "soreness": 2, "fatigue": 2, "stress": 2},
+])
+def test_wellness_validation(client, body):
+    assert client.post("/wellness", headers=AUTH, json=body).status_code == 422
+
+
+def test_app_files_need_no_key_and_send_security_headers(client):
+    page = client.get("/app/")
+    assert page.status_code == 200 and "LoadWise" in page.text
+    assert "script-src 'self'" in page.headers["content-security-policy"]
+    assert page.headers["x-content-type-options"] == "nosniff"
+    for path in ("/app/app.js", "/app/app.css", "/app/manifest.webmanifest", "/app/sw.js",
+                 "/app/icon-192.png", "/app/icon-512.png"):
+        assert client.get(path).status_code == 200, path
+    assert "Content-Security-Policy" not in client.get("/health").headers
+
+
+def test_root_redirects_to_the_app(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 307 and response.headers["location"] == "/app/"
+
+
+def test_app_has_no_inline_scripts_or_handlers():
+    """The CSP blocks inline code, so any inline script or onclick would silently not work."""
+    import re
+    from src.api import WEB_DIR
+
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", html)
+    assert not re.search(r"\son[a-z]+=", html)
+    assert "style=" not in html

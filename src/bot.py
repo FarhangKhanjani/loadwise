@@ -390,7 +390,7 @@ def api_error_message(error: Exception) -> str:
 class BotState:
     """Everything the handlers share. One authorized chat, so one agent conversation."""
     session_factory: sessionmaker[Session]
-    agent: Agent
+    agent: Agent | None  # None when only the API runs (python -m src.main --no-bot)
     timezone: str = "Europe/Vienna"
     as_of: date | None = None  # fixed "today" for demo data
     # One message at a time: the agent's history is a plain list, two concurrent turns

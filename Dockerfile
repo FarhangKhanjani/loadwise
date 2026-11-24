@@ -14,6 +14,8 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY src/ src/
+# The phone app (static files, served by FastAPI at /app)
+COPY web/ web/
 # The synthetic sample data (for --db data/demo.db) and the food catalogue. Real data is mounted.
 COPY data/sample_sessions.csv data/sample_wellness.csv data/foods.csv data/meals.json data/
 

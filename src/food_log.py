@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from src.models import Food, FoodLogEntry, MealTemplate
 from src.nutrition import (
     SLOTS,
+    Line,
     NutritionError,
     day_summary,
     grams_for,
@@ -114,12 +115,17 @@ def _save(db: Session, day: date, slot: str, lines, meal_name: str | None) -> li
     return entries
 
 
+def preview_food(db: Session, food: str, grams: float | None = None, portion: str | None = None,
+                 count: float = 1) -> Line:
+    """kcal and protein for an amount of one food, without saving (the app shows it live)."""
+    item = find_food(db, food)
+    return item_values(item, grams_for(item, grams, portion, count))
+
+
 def log_food(db: Session, day: date, slot: str, food: str, grams: float | None = None,
              portion: str | None = None, count: float = 1) -> FoodLogEntry:
     _check_slot(slot)
-    item = find_food(db, food)
-    line = item_values(item, grams_for(item, grams, portion, count))
-    return _save(db, day, slot, [line], None)[0]
+    return _save(db, day, slot, [preview_food(db, food, grams, portion, count)], None)[0]
 
 
 def preview_meal(db: Session, meal: str, include_optional=(), grams_override=None) -> tuple[MealTemplate, list]:

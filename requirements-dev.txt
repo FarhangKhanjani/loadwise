@@ -4,3 +4,6 @@
 
 pytest==9.2.0
 pytest-cov==7.1.0
+
+# Phase 9: QR code for pairing the phone (scripts/pair.py). Runs on your PC, not in Docker.
+qrcode==8.2

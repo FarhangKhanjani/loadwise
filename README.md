@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/FarhangKhanjani/loadwise/actions/workflows/tests.yml/badge.svg)](https://github.com/FarhangKhanjani/loadwise/actions/workflows/tests.yml)
 
-**A Telegram AI agent that tracks an athlete's training load and recovery.** It calculates established sports-science metrics in plain Python, flags overload and recovery patterns, answers questions about your own data in plain language, and sends a check every morning.
+**A Telegram AI agent and phone app that track an athlete's training load, recovery and calories.** It calculates established sports-science metrics in plain Python, flags overload and recovery patterns, answers questions about your own data in plain language, and sends a check every morning.
 
 > **Informational monitoring only, not medical advice.** LoadWise never diagnoses. For pain, injury or other symptoms it refers you to a doctor or physiotherapist, and to urgent care for chest pain, breathing problems or fainting.
 
@@ -21,6 +21,7 @@ LoadWise makes logging a one-line Telegram message, does the maths deterministic
 - **Ask about your data:** "how was my week?", "am I undertraining?". The agent answers with numbers taken from tools, never from its own estimates.
 - **Morning check at 08:00 (Vienna):** a Telegram alert when a new flag appears, never the same alert twice.
 - **Track calories and protein** from a food list with official USDA values, your saved meals (oatmeal bowl, nimrou…), and a monthly history.
+- **Phone app** on your home screen: today's load and flags, food logging with live totals, training and wellness logging, and the monthly history. It is served by your own PC and reached privately through Tailscale.
 - **Import your history** from a Strava export.
 - **HTTP API** for health checks, metrics and logging.
 
@@ -29,6 +30,7 @@ LoadWise makes logging a one-line Telegram message, does the maths deterministic
 ```mermaid
 flowchart LR
     you(["You on Telegram"])
+    phone(["Phone app (PWA)<br/>via Tailscale HTTPS"])
     subgraph app["One process: python -m src.main"]
         bot["Telegram bot<br/>python-telegram-bot"]
         agent["Agent loop<br/>Claude Haiku 5.5, tool use"]
@@ -45,7 +47,9 @@ flowchart LR
     bot -->|"free text"| agent
     agent <-->|"tool calls"| tools
     bot -->|"/log /wellness /status"| tools
+    phone <-->|"X-API-Key"| api
     api --> tools
+    api -->|"Save button"| confirm
     tools --> rules
     tools -->|"proposals"| db
     bot -->|"Confirm button"| confirm
@@ -81,7 +85,7 @@ sequenceDiagram
 **Design choices worth knowing:**
 - **The LLM never does the maths.** Metrics and flags are pure Python functions with 100% test coverage. The agent reads their results through tools, and the evals check that every number in a reply comes from a tool.
 - **A hand-written tool-use loop** instead of an SDK helper, so every step can be explained. Parallel tool results go back in one message, errors are returned to the model, and there's a cap of 8 tool calls per message.
-- **Human in the loop:** write tools only create proposals, and `confirm_action()` is the only code path that saves agent-proposed data. `/log`, `/wellness` and `POST /sessions` use the same path.
+- **Human in the loop:** write tools only create proposals, and `confirm_action()` is the only code path that saves agent-proposed data. `/log`, `/wellness`, `POST /sessions` and the phone app's Save button use the same path.
 - **No LLM in alerts:** the morning message comes straight from the rules. It's free, it can't make up numbers, and it works when the Claude API is down.
 - **Prompt caching:** the system prompt and tools are a cached prefix, and today's date goes with each message, not into the cached prompt. A typical question costs about $0.0004.
 
@@ -145,6 +149,40 @@ python scripts/usda_lookup.py build
 ```
 The app loads the catalogue at startup.
 
+## Phone app
+
+A web app that installs on the phone's home screen (a PWA) and opens full-screen like a normal app. Your PC serves it; there is no app store and no cloud.
+
+| Screen | What it shows |
+|---|---|
+| **Today** | ACWR, acute and chronic load, monotony, strain, active flags, data coverage, a 28-day load chart, and today's kcal per meal |
+| **Food** | saved meals (switch optional items on, change any amount, live total) and food search with portions; saved with one tap, with Undo |
+| **Training** | log a session (sport, minutes, RPE slider) or wellness, check the summary with its load, then Save or Discard; the last 14 days |
+| **History** | a month of days with kcal, the average per logged day, and each day's entries (delete one, or a whole meal) |
+
+**Set it up once:**
+1. Install [Tailscale](https://tailscale.com/download) on the PC and the phone and sign in to both with the same account. In the Tailscale admin console under DNS, keep MagicDNS on and enable HTTPS certificates.
+2. On the PC, let Tailscale forward HTTPS to LoadWise. This survives restarts:
+   ```bash
+   tailscale serve --bg 8000
+   ```
+3. Start LoadWise, then show the pairing QR code and scan it with the phone's camera:
+   ```bash
+   python -m scripts.pair
+   ```
+4. In the phone's browser: **Add to Home Screen** (Share menu on iPhone, ⋮ menu on Android).
+
+**How it's built and kept private:**
+- **Plain HTML, CSS and JavaScript** in `web/`, no framework and no build step. FastAPI serves it at `/app`.
+- **The phone does no maths.** Every number comes from the API, so all calculations stay in Python with unit tests. The app only displays them and sends what you enter.
+- **Only your devices can reach it.** The API still listens on `127.0.0.1`; `tailscale serve` passes HTTPS from your private Tailscale network to it, and nothing is opened to the internet. Tailscale also supplies the HTTPS certificate that phones require for installable apps.
+- **Pairing without typing a key:** the QR code holds the app address with the key after a `#`. Browsers never send that part to a server, so the key doesn't appear in requests or logs; the app stores it on the phone and removes it from the address bar. To unpair every phone, change `API_KEY` and restart.
+- **Same save path as Telegram:** a session or wellness entry is first a proposal; Save calls `POST /actions/{id}/confirm`, which runs `confirm_action()`.
+- **Strict Content Security Policy:** the app loads only its own files and runs no inline code, and server text is always inserted as text, never as HTML.
+- **Online only:** the app's files are cached so it opens instantly, but data always comes from the PC. Without a connection it says so instead of showing old numbers.
+
+To try it on the PC without Telegram: `python -m src.main --no-bot`, then open `http://127.0.0.1:8000/app/` and paste `API_KEY`.
+
 ## Evaluation
 
 20 scenarios in 4 categories, each run 3 times against the real agent, and graded by automatic checks (`evals/`). Details, failures and limitations are in [evals/RESULTS.md](evals/RESULTS.md).
@@ -172,7 +210,7 @@ You need a Telegram bot token from **@BotFather** (`/newbot`) and an Anthropic A
 ```bash
 cp .env.example .env
 ```
-Fill in `ANTHROPIC_API_KEY` and `TELEGRAM_BOT_TOKEN`. Optionally set `API_KEY` to use the HTTP API:
+Fill in `ANTHROPIC_API_KEY` and `TELEGRAM_BOT_TOKEN`. Set `API_KEY` to use the HTTP API and the phone app:
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
@@ -234,13 +272,18 @@ Sports: `gym`, `table_tennis` (`tt`), `table_tennis_match` (`match`), `padel`, `
 | `GET /health` | database, bot and last check status |
 | `GET /metrics?as_of=YYYY-MM-DD` | the numbers `/status` shows, as JSON |
 | `GET /flags?as_of=` | active flags and data coverage |
-| `POST /sessions` | proposes a session and sends you the Confirm buttons on Telegram |
+| `GET /meta` | today's date, sports, meal slots, and the slot for the current hour (for the app) |
+| `POST /sessions`, `POST /wellness` | propose a session or wellness entry; Confirm buttons go to Telegram unless `?notify_telegram=false` |
+| `POST /actions/{id}/confirm`, `POST /actions/{id}/reject` | save or discard a proposal (409 if already decided) |
+| `GET /sessions/recent?days=14` | recent sessions with their load, newest first |
 | `GET /foods?q=` | search foods (all foods without `q`) |
 | `GET /meals` | saved meals with their default kcal and protein |
+| `POST /food-log/preview` | kcal and protein for an amount, without saving |
 | `POST /food-log` | log a food: `{"slot", "food", "grams"}` or `{"slot", "food", "portion", "count"}` |
 | `POST /food-log/meal/preview`, `POST /food-log/meal` | preview or log a saved meal (`include_optional`, changed `grams`) |
 | `DELETE /food-log/{id}?whole_meal=` | delete an entry, or the whole meal it belongs to |
 | `GET /nutrition/day?date=`, `GET /nutrition/month?month=YYYY-MM` | daily and monthly history |
+| `GET /app/` | the phone app (no key needed for its files; it sends the key for data) |
 
 ```bash
 curl -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/metrics
@@ -265,7 +308,7 @@ curl -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/metrics
 ```bash
 pytest
 ```
-313 tests, run in CI on every push with no secrets needed, because the agent tests use a fake Claude client. The paid evals are run by hand:
+348 tests, run in CI on every push with no secrets needed, because the agent tests use a fake Claude client. The paid evals are run by hand:
 ```bash
 python -m evals.run_evals --model claude-haiku-5-5 --reps 3
 ```
@@ -282,7 +325,9 @@ src/
   api.py, main.py          FastAPI app; one process for API + bot + scheduler
   nutrition.py, food_log.py  calorie maths and search (pure); food log storage
   import_csv.py, import_strava.py
+web/                       the phone app: index.html, app.js, app.css, manifest, service worker
 scripts/usda_lookup.py     builds data/foods.csv from USDA FoodData Central
+scripts/pair.py            QR code that pairs your phone with the app
 data/foods.csv, meals.json food catalogue (with sources) and saved meals
 evals/                     scenarios, graders, runner, RESULTS.md
 tests/                     unit tests for everything above
@@ -293,6 +338,7 @@ tests/                     unit tests for everything above
 - **Missing data looks like rest.** This is handled with warnings and the coverage rule, but forgotten logs still lower the numbers.
 - **ACWR is debated** as an injury signal. Here it's a monitoring signal, with no injury prediction.
 - **Strava RPE is mostly estimated:** 85% of my logged history uses per-sport defaults.
+- **The phone app needs the PC.** It works from anywhere through Tailscale, but only while the PC is on and LoadWise is running, and it can't log offline.
 - **Single user, single machine.** One chat ID, SQLite, and the PC has to be on. A check missed during sleep runs on wake-up, but a check while the PC is off waits for the next start.
 - **A small synthetic eval** written by the same author as the prompt. It shows the tested rules hold, not how unexpected conversations go.
 

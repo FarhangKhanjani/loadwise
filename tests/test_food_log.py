@@ -124,3 +124,9 @@ def test_day_and_month(catalog_db):
 
     december_of_last_year = food_log.month(catalog_db, 2025, 12, today=DAY)  # year boundary
     assert december_of_last_year["days_in_range"] == 31 and december_of_last_year["days_logged"] == 0
+
+
+def test_preview_food_saves_nothing(catalog_db):
+    line = food_log.preview_food(catalog_db, "eier", portion="1 large", count=2)
+    assert (line.food, line.grams, line.kcal) == ("egg", 100.0, 143.0)
+    assert catalog_db.scalar(select(func.count()).select_from(FoodLogEntry)) == 0

@@ -2,6 +2,7 @@
 
   python -m src.main                                        # real data (DB_PATH from .env)
   python -m src.main --db data/demo.db --as-of 2026-02-15   # demo data on a fixed date
+  python -m src.main --no-bot                               # API and phone app only
 
 The first time, run `python -m src.bot` once to get your Telegram chat id (setup mode).
 """
@@ -29,6 +30,9 @@ def main() -> None:
     parser.add_argument("--as-of", type=date.fromisoformat,
                         help="Pretend today is this date (for demo data), YYYY-MM-DD")
     parser.add_argument("--model", default=settings.llm_model)
+    parser.add_argument("--no-bot", action="store_true",
+                        help="API and phone app only: no Telegram bot, no daily check, no Claude client")
+    parser.add_argument("--port", type=int, default=settings.api_port)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -36,28 +40,32 @@ def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     token = settings.telegram_bot_token
-    if not token or ":" not in token:
-        sys.exit("Set TELEGRAM_BOT_TOKEN in .env (create a bot with @BotFather in Telegram).")
-    if is_setup_mode(settings.telegram_chat_id):
-        sys.exit("Set TELEGRAM_CHAT_ID in .env first: run `python -m src.bot` and message your bot to get it.")
-    try:
-        client = anthropic.Anthropic()
-    except anthropic.AnthropicError as e:
-        sys.exit(f"Could not create the Claude client: {e}\nSet ANTHROPIC_API_KEY in .env.")
+    agent = None
+    if not args.no_bot:
+        if not token or ":" not in token:
+            sys.exit("Set TELEGRAM_BOT_TOKEN in .env (create a bot with @BotFather in Telegram).")
+        if is_setup_mode(settings.telegram_chat_id):
+            sys.exit("Set TELEGRAM_CHAT_ID in .env first: run `python -m src.bot` and message your bot to get it.")
+        try:
+            agent = Agent(anthropic.Anthropic(), args.model)
+        except anthropic.AnthropicError as e:
+            sys.exit(f"Could not create the Claude client: {e}\nSet ANTHROPIC_API_KEY in .env.")
 
     engine = make_engine(args.db)
     init_db(engine)
     factory = make_session_factory(engine)
     with factory() as db:
         load_catalog(db)  # foods and saved meals from data/; logged history is never changed
-    state = BotState(factory, Agent(client, args.model), settings.timezone, args.as_of)
-    telegram = build_application(token, state, int(settings.telegram_chat_id))
+    state = BotState(factory, agent, settings.timezone, args.as_of)
+    telegram = None if args.no_bot else build_application(token, state, int(settings.telegram_chat_id))
     app = create_app(state, settings.api_key, telegram)
 
-    print(f"LoadWise on {engine.url.database} ({args.model}"
+    base = f"http://{settings.api_host}:{args.port}"
+    print(f"LoadWise on {engine.url.database} ("
+          + ("API only, no bot" if args.no_bot else args.model)
           + (f", today = {args.as_of}" if args.as_of else "")
-          + f"). API: http://{settings.api_host}:{settings.api_port}/health  Ctrl+C to stop.")
-    uvicorn.run(app, host=settings.api_host, port=settings.api_port)
+          + f"). App: {base}/app/  Health: {base}/health  Ctrl+C to stop.")
+    uvicorn.run(app, host=settings.api_host, port=args.port)
 
 
 if __name__ == "__main__":

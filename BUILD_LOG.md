@@ -383,3 +383,44 @@ All code, tests, the lookup script, the food and meal files from my list, and th
 - Official values (USDA) instead of typed-in numbers; got the USDA API key
 - Gave the BILLA Protein Toast label values; beef weighed raw; meat plate with veggies and fries together; pancakes without flour, a little olive oil
 - _(add anything else here)_
+
+---
+
+## Phase 9: Phone app (2026-11-24)
+
+The second half of my scope change: use LoadWise from my phone, not only through Telegram.
+
+### What was built
+- **`web/`: a PWA**, plain HTML, CSS and JavaScript with no framework and no build step. FastAPI serves it at `/app`, and it installs on the home screen with its own icon.
+  - **Today:** ACWR, acute and chronic load, monotony, strain, flags, data coverage, a 28-day load chart (SVG), and today's kcal per meal slot.
+  - **Food:** saved meals with optional items and editable amounts and a live total; food search with portions and a live preview; save with Undo.
+  - **Training:** session and wellness forms, then a "Check and save" step (Save or Discard), plus the last 14 days.
+  - **History:** month navigation, the average per logged day, and day details with deleting an entry or a whole meal.
+- **New endpoints:** `GET /meta`, `GET /sessions/recent`, `POST /wellness`, `POST /food-log/preview`, `POST /actions/{id}/confirm` and `/reject`, `?notify_telegram=false` on proposals, and `/` redirecting to `/app/`.
+- **Security headers on `/app`:** a strict Content Security Policy (own files only, no inline code), `nosniff`, `no-referrer`.
+- **`scripts/pair.py`:** reads `API_KEY` from `.env` and the PC's Tailscale name from `tailscale status --json`, and prints a QR code that opens the app already paired.
+- **`python -m src.main --no-bot`:** API and app without Telegram or Claude (previews, or if the bot isn't needed).
+- **Tests:** 35 new (API endpoints, app files and headers, "no inline scripts" check, slot by hour, food preview, pairing link). 348 in total.
+
+### Key decisions
+- **No framework.** Four screens don't justify React and npm, and the project stays Python-only to run and test.
+- **All maths stays on the server.** The app never calculates a metric or a kcal value; even the live preview while typing an amount comes from `POST /food-log/preview`. That keeps "every calculation gets a unit test" true without a JavaScript test setup.
+- **Tailscale `serve`, not an open port.** The API keeps listening on `127.0.0.1`. Tailscale passes HTTPS from my private network to it and provides the certificate phones need to install a web app. `funnel` (public internet) is not used.
+- **The pairing key goes after `#` in the QR link.** Browsers never send that part to the server, so the key doesn't show up in any request or log. The app moves it into the phone's storage and removes it from the address bar.
+- **Training and wellness still go through proposals.** The app's Save button calls `confirm_action()`, the same single save path as Telegram, and a second confirm (for example the Telegram button after the app) returns 409 and changes nothing.
+- **Food is saved directly, with Undo,** as decided in Phase 8.
+- **Online only.** The service worker caches only the app's own files, never data, so numbers are never stale. An offline queue would add a lot of complexity for little gain.
+- **Chat with the agent stays in Telegram** for now; an in-app chat could be a later phase.
+
+### Verification
+- 348 tests pass.
+- Every screen checked in a browser at phone size (375×812), in dark and light mode, against a scratch copy of the sample data with a throwaway key (never the real database). That covered pairing from a link, logging a meal with an optional item and a changed amount (604 kcal, matching the line items), Undo, food search ("eier" finds egg), saving a session (acute load went from 4,253 to 4,613), the "wellness already logged" error, and the month history with day details. The service worker was active and the Content Security Policy produced no violations.
+- Fixed during the check: a pairing link opened in an already open app was ignored; the single-food panel showed "[object HTMLDivElement]"; capital letters on names (CSS `::first-letter` doesn't apply to inline and flex elements).
+- **Still open:** the real setup on my phone (Tailscale install, `tailscale serve --bg 8000`, scan the QR code, add to home screen). Tailscale isn't installed on the PC yet.
+
+### What the AI generated
+All code (web app, endpoints, pairing script), tests, icons, the README section and this entry.
+
+### What I decided or changed myself
+- Asked for a phone app; approved the plan (PWA, Tailscale, QR pairing, chat stays in Telegram, online only)
+- _(add anything else here)_
